@@ -13,6 +13,7 @@ import io.airlift.airship.agent.DeploymentManagerFactory;
 import io.airlift.airship.agent.DirectoryDeploymentManagerFactory;
 import io.airlift.airship.agent.LauncherLifecycleManager;
 import io.airlift.airship.agent.LifecycleManager;
+import io.airlift.airship.agent.Progress;
 import io.airlift.airship.agent.Slot;
 import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.CoordinatorConfig;
@@ -397,7 +398,7 @@ public class CommanderFactory
         @Override
         public SlotStatus assign(Installation installation)
         {
-            return slot.assign(installation).changeInstanceId(instanceId);
+            return slot.assign(installation, new Progress()).changeInstanceId(instanceId);
         }
 
         @Override

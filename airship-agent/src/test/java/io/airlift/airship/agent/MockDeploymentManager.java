@@ -31,7 +31,7 @@ public class MockDeploymentManager implements DeploymentManager
     }
 
     @Override
-    public Deployment install(Installation installation)
+    public Deployment install(Installation installation, Progress progress)
     {
         Preconditions.checkNotNull(installation, "installation is null");
 

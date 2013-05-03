@@ -16,6 +16,7 @@ package io.airlift.airship.agent;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
+import io.airlift.airship.agent.job.AgentJobResource;
 import io.airlift.airship.shared.VersionConflictExceptionMapper;
 import io.airlift.configuration.ConfigurationModule;
 
@@ -33,6 +34,8 @@ public class AgentMainModule
         newExporter(binder).export(Agent.class).withGeneratedName();
 
         binder.bind(AgentResource.class).in(Scopes.SINGLETON);
+
+        binder.bind(AgentJobResource.class).in(Scopes.SINGLETON);
 
         binder.bind(SlotResource.class).in(Scopes.SINGLETON);
         binder.bind(AssignmentResource.class).in(Scopes.SINGLETON);

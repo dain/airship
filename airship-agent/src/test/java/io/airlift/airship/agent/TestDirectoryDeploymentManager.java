@@ -59,7 +59,7 @@ public class TestDirectoryDeploymentManager extends AbstractDeploymentManagerTes
     public void testPersistence()
     {
         // install apple and banana and activate apple
-        Deployment appleDeployment = manager.install(appleInstallation);
+        Deployment appleDeployment = manager.install(appleInstallation, new Progress());
 
         // replace the deployment manager with a new one, which will cause the persistent data to reload
         final AgentConfig config = new AgentConfig();

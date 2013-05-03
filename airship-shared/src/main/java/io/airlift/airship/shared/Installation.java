@@ -13,6 +13,8 @@
  */
 package io.airlift.airship.shared;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
@@ -29,7 +31,12 @@ public class Installation
     private final URI configFile;
     private final Map<String, Integer> resources;
 
-    public Installation(String shortName, Assignment assignment, URI binaryFile, URI configFile, Map<String, Integer> resources)
+    @JsonCreator
+    public Installation(@JsonProperty("shortName") String shortName,
+            @JsonProperty("assignment") Assignment assignment,
+            @JsonProperty("binaryFile") URI binaryFile,
+            @JsonProperty("configFile") URI configFile,
+            @JsonProperty("resources") Map<String, Integer> resources)
     {
         Preconditions.checkNotNull(shortName, "shortName is null");
         Preconditions.checkNotNull(assignment, "assignment is null");
@@ -44,26 +51,31 @@ public class Installation
         this.resources = ImmutableMap.copyOf(resources);
     }
 
+    @JsonProperty
     public String getShortName()
     {
         return shortName;
     }
 
+    @JsonProperty
     public Assignment getAssignment()
     {
         return assignment;
     }
 
+    @JsonProperty
     public URI getBinaryFile()
     {
         return binaryFile;
     }
 
+    @JsonProperty
     public URI getConfigFile()
     {
         return configFile;
     }
 
+    @JsonProperty
     public Map<String, Integer> getResources()
     {
         return resources;

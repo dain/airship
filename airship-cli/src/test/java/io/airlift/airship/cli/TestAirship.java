@@ -139,11 +139,20 @@ public class TestAirship
         assertNull(outputFormat.coordinators);
         assertNull(outputFormat.agents);
 
+        execute("stop", "-c", APPLE_ASSIGNMENT.getConfig());
+
+        assertNotNull(outputFormat.slots);
+        assertEquals(outputFormat.slots.size(), 1);
+        assertSlotStatus(outputFormat.slots.get(0), slotId, APPLE_ASSIGNMENT, SlotLifecycleState.STOPPED, agent);
+
+        assertNull(outputFormat.coordinators);
+        assertNull(outputFormat.agents);
+
         execute("upgrade", "-c", APPLE_ASSIGNMENT.getConfig(), "2.0", "@2.0");
 
         assertNotNull(outputFormat.slots);
         assertEquals(outputFormat.slots.size(), 1);
-        assertSlotStatus(outputFormat.slots.get(0), slotId, APPLE_ASSIGNMENT_2, SlotLifecycleState.RUNNING, agent);
+        assertSlotStatus(outputFormat.slots.get(0), slotId, APPLE_ASSIGNMENT_2, SlotLifecycleState.STOPPED, agent);
 
         assertNull(outputFormat.coordinators);
         assertNull(outputFormat.agents);

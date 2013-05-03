@@ -13,6 +13,8 @@
  */
 package io.airlift.airship.shared;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 
 import javax.annotation.concurrent.Immutable;
@@ -23,7 +25,8 @@ public class Assignment
     private final String binary;
     private final String config;
 
-    public Assignment(String binary, String config)
+    @JsonCreator
+    public Assignment(@JsonProperty("binary") String binary, @JsonProperty("config") String config)
     {
         Preconditions.checkNotNull(binary, "binary is null");
         Preconditions.checkNotNull(config, "config is null");
@@ -32,11 +35,13 @@ public class Assignment
         this.config = config;
     }
 
+    @JsonProperty
     public String getBinary()
     {
         return binary;
     }
 
+    @JsonProperty
     public String getConfig()
     {
         return config;

@@ -1,16 +1,30 @@
 package io.airlift.airship.agent;
 
+import com.google.common.collect.ImmutableList;
+import io.airlift.airship.shared.SlotLifecycleState;
+import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.job.InstallTask;
+import io.airlift.airship.shared.job.SlotJob;
+import io.airlift.airship.shared.job.SlotJobId;
+import io.airlift.airship.shared.job.SlotJobStatus;
+import io.airlift.airship.shared.job.SlotJobStatus.SlotJobState;
+import io.airlift.airship.shared.job.StartTask;
 import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
+import io.airlift.units.Duration;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
 import java.net.InetAddress;
+import java.util.concurrent.TimeUnit;
 
 import static io.airlift.airship.agent.ResourcesUtil.TEST_RESOURCES;
+import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertNotNull;
 
 public class TestAgent
 {
@@ -49,4 +63,79 @@ public class TestAgent
         assertEquals(agent.getResources(), TEST_RESOURCES);
     }
 
+    @Test
+    public void testSlotInstallationJob()
+            throws Exception
+    {
+        SlotJob slotJob = new SlotJob(new SlotJobId("job"), null, ImmutableList.of(new InstallTask(APPLE_INSTALLATION)));
+        SlotJobStatus slotJobStatus = agent.createJob(slotJob);
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+
+        // wait for job to start
+        if (slotJobStatus.getState() == SlotJobState.PENDING) {
+            agent.waitForJobStateChange(slotJob.getSlotJobId(), SlotJobState.PENDING, new Duration(1, TimeUnit.MINUTES));
+            slotJobStatus = agent.getJobStatus(slotJob.getSlotJobId());
+        }
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+        assertNotEquals(slotJobStatus.getState(), SlotJobState.PENDING);
+
+        // wait for job to finish
+        if (slotJobStatus.getState() == SlotJobState.RUNNING) {
+            agent.waitForJobStateChange(slotJob.getSlotJobId(), SlotJobState.RUNNING, new Duration(1, TimeUnit.MINUTES));
+            slotJobStatus = agent.getJobStatus(slotJob.getSlotJobId());
+        }
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+        assertNotEquals(slotJobStatus.getState(), SlotJobState.RUNNING);
+
+        // verify done
+        assertEquals(slotJobStatus.getState(), SlotJobState.DONE);
+        SlotStatusRepresentation slotStatus = slotJobStatus.getSlotStatus();
+        assertNotNull(slotStatus, "slotStatus is null");
+        assertEquals(slotStatus.getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
+        assertEquals(slotStatus.getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
+        assertEquals(slotStatus.getStatus(), SlotLifecycleState.STOPPED.toString());
+
+        Slot slot = agent.getSlot(slotStatus.getId());
+        assertNotNull(slot, "slot is null");
+        assertEquals(slot.getLastSlotStatus().getAssignment(), APPLE_INSTALLATION.getAssignment());
+        assertEquals(slot.getLastSlotStatus().getState(), SlotLifecycleState.STOPPED);
+    }
+
+    @Test
+    public void testSlotInstallationAndStartJob()
+            throws Exception
+    {
+        SlotJob slotJob = new SlotJob(new SlotJobId("job"), null, ImmutableList.of(new InstallTask(APPLE_INSTALLATION), new StartTask()));
+        SlotJobStatus slotJobStatus = agent.createJob(slotJob);
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+
+        // wait for job to start
+        if (slotJobStatus.getState() == SlotJobState.PENDING) {
+            agent.waitForJobStateChange(slotJob.getSlotJobId(), SlotJobState.PENDING, new Duration(1, TimeUnit.MINUTES));
+            slotJobStatus = agent.getJobStatus(slotJob.getSlotJobId());
+        }
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+        assertNotEquals(slotJobStatus.getState(), SlotJobState.PENDING);
+
+        // wait for job to finish
+        if (slotJobStatus.getState() == SlotJobState.RUNNING) {
+            agent.waitForJobStateChange(slotJob.getSlotJobId(), SlotJobState.RUNNING, new Duration(1, TimeUnit.MINUTES));
+            slotJobStatus = agent.getJobStatus(slotJob.getSlotJobId());
+        }
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+        assertNotEquals(slotJobStatus.getState(), SlotJobState.RUNNING);
+
+        // verify done
+        assertEquals(slotJobStatus.getState(), SlotJobState.DONE);
+        SlotStatusRepresentation slotStatus = slotJobStatus.getSlotStatus();
+        assertNotNull(slotStatus, "slotStatus is null");
+        assertEquals(slotStatus.getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
+        assertEquals(slotStatus.getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
+        assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString());
+
+        Slot slot = agent.getSlot(slotStatus.getId());
+        assertNotNull(slot, "slot is null");
+        assertEquals(slot.getLastSlotStatus().getAssignment(), APPLE_INSTALLATION.getAssignment());
+        assertEquals(slot.getLastSlotStatus().getState(), SlotLifecycleState.RUNNING);
+    }
 }

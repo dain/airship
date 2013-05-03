@@ -67,7 +67,7 @@ public class AssignmentResource
         checkAgentVersion(agent.getAgentStatus(), agentVersion);
         checkSlotVersion(slot.status(), slotVersion);
 
-        SlotStatus status = slot.assign(installation.toInstallation());
+        SlotStatus status = slot.assign(installation.toInstallation(), new Progress());
         return Response.ok(SlotStatusRepresentation.from(status))
                 .header(AIRSHIP_AGENT_VERSION_HEADER, agent.getAgentStatus().getVersion())
                 .header(AIRSHIP_SLOT_VERSION_HEADER, status.getVersion())

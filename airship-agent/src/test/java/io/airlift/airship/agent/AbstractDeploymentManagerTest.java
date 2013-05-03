@@ -20,13 +20,13 @@ public abstract class AbstractDeploymentManagerTest
         assertNull(manager.getDeployment());
 
         // install apple deployment
-        Deployment appleDeployment = manager.install(appleInstallation);
+        Deployment appleDeployment = manager.install(appleInstallation, new Progress());
         assertNotNull(appleDeployment);
         assertEquals(manager.getDeployment(), appleDeployment);
         assertEquals(appleDeployment.getAssignment(), appleInstallation.getAssignment());
 
         // install banana
-        Deployment bananaDeployment = manager.install(bananaInstallation);
+        Deployment bananaDeployment = manager.install(bananaInstallation, new Progress());
         assertNotNull(bananaDeployment);
         assertEquals(manager.getDeployment(), bananaDeployment);
         assertEquals(bananaDeployment.getAssignment(), bananaInstallation.getAssignment());

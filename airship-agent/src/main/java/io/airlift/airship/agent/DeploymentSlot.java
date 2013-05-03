@@ -13,31 +13,32 @@
  */
 package io.airlift.airship.agent;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.Installation;
+import io.airlift.airship.shared.StateMachine;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static io.airlift.airship.shared.SlotLifecycleState.RESTARTING;
-import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
 import static io.airlift.airship.shared.SlotLifecycleState.UNKNOWN;
 import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
 
-public class DeploymentSlot implements Slot
+public class DeploymentSlot
+        implements Slot
 {
     private static final Logger log = Logger.get(DeploymentSlot.class);
 
@@ -48,7 +49,7 @@ public class DeploymentSlot implements Slot
     private final Duration lockWait;
     private final DeploymentManager deploymentManager;
     private final LifecycleManager lifecycleManager;
-    private final AtomicReference<SlotStatus> lastSlotStatus;
+    private final StateMachine<SlotStatus> lastSlotStatus;
     private boolean terminated;
 
     private final ReentrantLock lock = new ReentrantLock();
@@ -59,13 +60,15 @@ public class DeploymentSlot implements Slot
             URI externalUri,
             DeploymentManager deploymentManager,
             LifecycleManager lifecycleManager,
-            Duration maxLockWait)
+            Duration maxLockWait,
+            Executor executor)
     {
-        Preconditions.checkNotNull(self, "self is null");
-        Preconditions.checkNotNull(externalUri, "externalUri is null");
-        Preconditions.checkNotNull(deploymentManager, "deploymentManager is null");
-        Preconditions.checkNotNull(lifecycleManager, "lifecycleManager is null");
-        Preconditions.checkNotNull(maxLockWait, "maxLockWait is null");
+        checkNotNull(self, "self is null");
+        checkNotNull(externalUri, "externalUri is null");
+        checkNotNull(deploymentManager, "deploymentManager is null");
+        checkNotNull(lifecycleManager, "lifecycleManager is null");
+        checkNotNull(maxLockWait, "maxLockWait is null");
+        checkNotNull(executor, "executor is null");
 
         this.location = deploymentManager.getLocation();
         this.deploymentManager = deploymentManager;
@@ -75,10 +78,11 @@ public class DeploymentSlot implements Slot
         id = deploymentManager.getSlotId();
         this.self = self;
         this.externalUri = externalUri;
+        this.lastSlotStatus = new StateMachine<>("slot " + id, executor, null);
 
         Deployment deployment = deploymentManager.getDeployment();
         if (deployment == null) {
-            SlotStatus slotStatus = createSlotStatus(id,
+            lastSlotStatus.set(createSlotStatus(id,
                     self,
                     externalUri,
                     null,
@@ -86,22 +90,20 @@ public class DeploymentSlot implements Slot
                     UNKNOWN,
                     null,
                     deploymentManager.hackGetDataDir().getAbsolutePath(),
-                    ImmutableMap.<String, Integer>of());
-            lastSlotStatus = new AtomicReference<>(slotStatus);
-            return;
+                    ImmutableMap.<String, Integer>of()));
         }
-
-        SlotLifecycleState state = lifecycleManager.status(deployment);
-        SlotStatus slotStatus = createSlotStatus(id,
-                self,
-                externalUri,
-                null,
-                location,
-                state,
-                deployment.getAssignment(),
-                deployment.getDataDir().getAbsolutePath(),
-                deployment.getResources());
-        lastSlotStatus = new AtomicReference<SlotStatus>(slotStatus);
+        else {
+            SlotLifecycleState state = lifecycleManager.status(deployment);
+            lastSlotStatus.set(createSlotStatus(id,
+                    self,
+                    externalUri,
+                    null,
+                    location,
+                    state,
+                    deployment.getAssignment(),
+                    deployment.getDataDir().getAbsolutePath(),
+                    deployment.getResources()));
+        }
     }
 
     public DeploymentSlot(URI self,
@@ -109,12 +111,13 @@ public class DeploymentSlot implements Slot
             DeploymentManager deploymentManager,
             LifecycleManager lifecycleManager,
             Installation installation,
-            Duration maxLockWait)
+            Duration maxLockWait,
+            Executor executor)
     {
-        Preconditions.checkNotNull(deploymentManager, "deploymentManager is null");
-        Preconditions.checkNotNull(lifecycleManager, "lifecycleManager is null");
-        Preconditions.checkNotNull(installation, "installation is null");
-        Preconditions.checkNotNull(maxLockWait, "maxLockWait is null");
+        checkNotNull(deploymentManager, "deploymentManager is null");
+        checkNotNull(lifecycleManager, "lifecycleManager is null");
+        checkNotNull(installation, "installation is null");
+        checkNotNull(maxLockWait, "maxLockWait is null");
 
         this.location = deploymentManager.getLocation();
         this.deploymentManager = deploymentManager;
@@ -128,22 +131,24 @@ public class DeploymentSlot implements Slot
         // install the software
         try {
             // deploy new server
-            deploymentManager.install(installation);
+            deploymentManager.install(installation, new Progress());
 
             // create node config file
             Deployment deployment = deploymentManager.getDeployment();
             lifecycleManager.updateNodeConfig(deployment);
 
             // set initial status
-            lastSlotStatus = new AtomicReference<SlotStatus>(createSlotStatus(id,
-                    self,
-                    externalUri,
-                    null,
-                    location,
-                    STOPPED,
-                    installation.getAssignment(),
-                    deployment.getDataDir().getAbsolutePath(),
-                    deployment.getResources()));
+            lastSlotStatus = new StateMachine<>("slot " + id,
+                    executor,
+                    createSlotStatus(id,
+                            self,
+                            externalUri,
+                            null,
+                            location,
+                            STOPPED,
+                            installation.getAssignment(),
+                            deployment.getDataDir().getAbsolutePath(),
+                            deployment.getResources()));
         }
         catch (Exception e) {
             deploymentManager.terminate();
@@ -170,54 +175,34 @@ public class DeploymentSlot implements Slot
     }
 
     @Override
-    public SlotStatus assign(Installation installation)
+    public SlotStatus assign(Installation installation, Progress progress)
     {
-        Preconditions.checkNotNull(installation, "installation is null");
+        checkNotNull(installation, "installation is null");
 
         lock();
         try {
-            Preconditions.checkState(!terminated, "Slot has been terminated");
+            checkNotNull(progress, "progress is null");
+            checkState(!terminated, "Slot has been terminated");
+
+            progress.reset("Checking status");
+            SlotStatus status = status();
+
+            checkState(status.getState() == STOPPED, "Slot is not stopped");
 
             log.info("Becoming %s with %s", installation.getAssignment().getBinary(), installation.getAssignment().getConfig());
 
-            // stop current server
-            Deployment oldDeployment = deploymentManager.getDeployment();
-            boolean shouldStart = false;
-            if (oldDeployment != null) {
-                // if deployment is running, we will restart it after the upgrade
-                SlotLifecycleState currentState = lifecycleManager.status(oldDeployment);
-                shouldStart = currentState == RUNNING || currentState == RESTARTING;
-
-                // stop old deployment
-                try {
-                    lifecycleManager.stop(oldDeployment);
-                }
-                catch (Exception e) {
-                    // stop failed, just kill the process
-                    lifecycleManager.kill(oldDeployment);
-                }
-            }
-
             // deploy new server
-            Deployment deployment = deploymentManager.install(installation);
+            Deployment deployment = deploymentManager.install(installation, progress);
 
             // create node config file
             lifecycleManager.updateNodeConfig(deployment);
-
-            // restart the server if it was previously running
-            SlotLifecycleState state;
-            if (shouldStart) {
-                state = lifecycleManager.start(deployment);
-            } else {
-                state = STOPPED;
-            }
 
             SlotStatus slotStatus = createSlotStatus(id,
                     self,
                     externalUri,
                     null,
                     location,
-                    state,
+                    STOPPED,
                     installation.getAssignment(),
                     deployment.getDataDir().getAbsolutePath(),
                     deployment.getResources());
@@ -297,24 +282,18 @@ public class DeploymentSlot implements Slot
     @Override
     public SlotStatus start()
     {
-        lock();
-        try {
-            Preconditions.checkState(!terminated, "Slot has been terminated");
+        checkState(!terminated, "Slot has been terminated");
 
-            Deployment activeDeployment = deploymentManager.getDeployment();
-            if (activeDeployment == null) {
-                throw new IllegalStateException("Slot can not be started because the slot is not assigned");
-            }
-
-            SlotLifecycleState state = lifecycleManager.start(activeDeployment);
-
-            SlotStatus slotStatus = lastSlotStatus.get().changeState(state);
-            lastSlotStatus.set(slotStatus);
-            return slotStatus;
+        Deployment activeDeployment = deploymentManager.getDeployment();
+        if (activeDeployment == null) {
+            throw new IllegalStateException("Slot can not be started because the slot is not assigned");
         }
-        finally {
-            unlock();
-        }
+
+        SlotLifecycleState state = lifecycleManager.start(activeDeployment);
+
+        SlotStatus slotStatus = lastSlotStatus.get().changeState(state);
+        lastSlotStatus.set(slotStatus);
+        return slotStatus;
     }
 
     @Override
@@ -322,7 +301,7 @@ public class DeploymentSlot implements Slot
     {
         lock();
         try {
-            Preconditions.checkState(!terminated, "Slot has been terminated");
+            checkState(!terminated, "Slot has been terminated");
 
             Deployment activeDeployment = deploymentManager.getDeployment();
             if (activeDeployment == null) {
@@ -345,7 +324,7 @@ public class DeploymentSlot implements Slot
     {
         lock();
         try {
-            Preconditions.checkState(!terminated, "Slot has been terminated");
+            checkState(!terminated, "Slot has been terminated");
 
             Deployment activeDeployment = deploymentManager.getDeployment();
             if (activeDeployment == null) {
@@ -368,7 +347,7 @@ public class DeploymentSlot implements Slot
     {
         lock();
         try {
-            Preconditions.checkState(!terminated, "Slot has been terminated");
+            checkState(!terminated, "Slot has been terminated");
 
             Deployment activeDeployment = deploymentManager.getDeployment();
             if (activeDeployment == null) {

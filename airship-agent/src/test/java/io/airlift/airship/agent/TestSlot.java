@@ -13,11 +13,13 @@
  */
 package io.airlift.airship.agent;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.units.Duration;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.util.concurrent.Executors;
 
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
 import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
@@ -46,7 +48,8 @@ public class TestSlot
                 deploymentManager,
                 lifecycleManager,
                 APPLE_INSTALLATION,
-                new Duration(1, SECONDS));
+                new Duration(1, SECONDS),
+                Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("slot-job-%d").build()));
         SlotStatus status = slot.status();
         assertNotNull(status);
         assertEquals(status.getAssignment(), APPLE_ASSIGNMENT);
@@ -55,7 +58,7 @@ public class TestSlot
         assertTrue(lifecycleManager.getNodeConfigUpdated().contains(deploymentManager.getDeployment().getNodeId()));
 
         // assign banana and verify state
-        status = slot.assign(BANANA_INSTALLATION);
+        status = slot.assign(BANANA_INSTALLATION, new Progress());
         assertNotNull(status);
         assertEquals(status.getAssignment(), BANANA_ASSIGNMENT);
         assertEquals(status.getState(), STOPPED);
@@ -79,14 +82,15 @@ public class TestSlot
                 new MockDeploymentManager(),
                 new MockLifecycleManager(),
                 APPLE_INSTALLATION,
-                new Duration(1, SECONDS));
+                new Duration(1, SECONDS),
+                Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("slot-job-%d").build()));
         SlotStatus status1 = slot.status();
         SlotStatus running = status1.changeAssignment(RUNNING, APPLE_ASSIGNMENT, status1.getResources());
         SlotStatus status = slot.status();
         SlotStatus stopped = status.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status.getResources());
 
         // assign => stopped
-        assertEquals(slot.assign(APPLE_INSTALLATION), stopped);
+        assertEquals(slot.assign(APPLE_INSTALLATION, new Progress()), stopped);
 
         // stopped.start => running
         assertEquals(slot.start(), running);

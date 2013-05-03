@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.google.common.base.Charsets.UTF_8;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static io.airlift.airship.shared.FileUtils.createTempDir;
 import static io.airlift.airship.shared.FileUtils.deleteRecursively;
 import static io.airlift.airship.shared.FileUtils.extractTar;
@@ -39,12 +40,12 @@ public class DirectoryDeploymentManager implements DeploymentManager
 
     public DirectoryDeploymentManager(File baseDir, String location, Duration tarTimeout)
     {
-        Preconditions.checkNotNull(location, "location is null");
+        checkNotNull(location, "location is null");
         Preconditions.checkArgument(location.startsWith("/"), "location must start with /");
         this.location = location;
         this.tarTimeout = tarTimeout;
 
-        Preconditions.checkNotNull(baseDir, "baseDir is null");
+        checkNotNull(baseDir, "baseDir is null");
         baseDir.mkdirs();
         Preconditions.checkArgument(baseDir.isDirectory(), "baseDir is not a directory: " + baseDir.getAbsolutePath());
         this.baseDir = baseDir;
@@ -115,9 +116,10 @@ public class DirectoryDeploymentManager implements DeploymentManager
     }
 
     @Override
-    public Deployment install(Installation installation)
+    public Deployment install(Installation installation, Progress progress)
     {
-        Preconditions.checkNotNull(installation, "installation is null");
+        checkNotNull(installation, "installation is null");
+        checkNotNull(progress, "progress is null");
 
         File deploymentDir = new File(baseDir, "installation");
 
@@ -127,6 +129,7 @@ public class DirectoryDeploymentManager implements DeploymentManager
         File tempDir = createTempDir(baseDir, "tmp-install");
         try {
             // download the binary
+            progress.reset("Downloading binary");
             File binary = new File(tempDir, "airship-binary.tar.gz");
             try {
                 Files.copy(Resources.newInputStreamSupplier(installation.getBinaryFile().toURL()), binary);
@@ -136,6 +139,7 @@ public class DirectoryDeploymentManager implements DeploymentManager
             }
 
             // unpack the binary into a temp unpack dir
+            progress.reset("Unpacking binary");
             File unpackDir = new File(tempDir, "unpack");
             unpackDir.mkdirs();
             try {
@@ -153,6 +157,7 @@ public class DirectoryDeploymentManager implements DeploymentManager
             File binaryRootDir = files.get(0);
 
             // unpack config bundle
+            progress.reset("Downloading config");
             try {
                 URL url = installation.getConfigFile().toURL();
                 ConfigUtils.unpackConfig(Resources.newInputStreamSupplier(url), binaryRootDir);

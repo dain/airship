@@ -32,7 +32,6 @@ import java.io.File;
 import java.util.UUID;
 
 import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
-import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENT_VERSION_HEADER;
 import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_SLOT_VERSION_HEADER;
@@ -122,14 +121,14 @@ public class TestAssignmentResource
         assertUpgrade(slotStatus, agent.getAgentStatus().getVersion(), slotStatus.getVersion());
     }
 
-    @Test
-    public void testAssignRestarts()
-    {
-        SlotStatus slotStatus = agent.install(APPLE_INSTALLATION);
-        slotStatus = agent.getSlot(slotStatus.getId()).start();
-        assertEquals(slotStatus.getState(), RUNNING);
-        assertUpgrade(slotStatus, agent.getAgentStatus().getVersion(), slotStatus.getVersion());
-    }
+//    @Test
+//    public void testAssignRestarts()
+//    {
+//        SlotStatus slotStatus = agent.install(APPLE_INSTALLATION);
+//        slotStatus = agent.getSlot(slotStatus.getId()).start();
+//        assertEquals(slotStatus.getState(), RUNNING);
+//        assertUpgrade(slotStatus, agent.getAgentStatus().getVersion(), slotStatus.getVersion());
+//    }
 
     @Test
     public void testAssignNoAgentVersion()

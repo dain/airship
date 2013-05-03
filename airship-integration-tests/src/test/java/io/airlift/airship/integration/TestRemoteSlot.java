@@ -26,6 +26,7 @@ import io.airlift.airship.agent.DeploymentManagerFactory;
 import io.airlift.airship.agent.LifecycleManager;
 import io.airlift.airship.agent.MockDeploymentManagerFactory;
 import io.airlift.airship.agent.MockLifecycleManager;
+import io.airlift.airship.agent.Progress;
 import io.airlift.airship.agent.Slot;
 import io.airlift.airship.coordinator.HttpRemoteAgent;
 import io.airlift.airship.coordinator.HttpRemoteSlot;
@@ -200,7 +201,7 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
-        assertEquals(slot.assign(APPLE_INSTALLATION).getAssignment(), APPLE_ASSIGNMENT);
+        assertEquals(slot.assign(APPLE_INSTALLATION, new Progress()).getAssignment(), APPLE_ASSIGNMENT);
 
         // test
         remoteAgent.setStatus(agent.getAgentStatus());
@@ -225,7 +226,7 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
-        assertEquals(slot.assign(APPLE_INSTALLATION).getState(), STOPPED);
+        assertEquals(slot.assign(APPLE_INSTALLATION, new Progress()).getState(), STOPPED);
 
         // test
         remoteAgent.setStatus(agent.getAgentStatus());
@@ -243,7 +244,7 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
-        slot.assign(APPLE_INSTALLATION);
+        slot.assign(APPLE_INSTALLATION, new Progress());
         assertEquals(slot.start().getState(), RUNNING);
 
         // test
@@ -262,7 +263,7 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
-        slot.assign(APPLE_INSTALLATION);
+        slot.assign(APPLE_INSTALLATION, new Progress());
         assertEquals(slot.start().getState(), RUNNING);
 
         // test
@@ -281,7 +282,7 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
-        assertEquals(slot.assign(APPLE_INSTALLATION).getState(), STOPPED);
+        assertEquals(slot.assign(APPLE_INSTALLATION, new Progress()).getState(), STOPPED);
 
         // test
         remoteAgent.setStatus(agent.getAgentStatus());
