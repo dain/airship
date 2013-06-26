@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.airship.agent.Agent;
 import io.airlift.airship.agent.DeploymentManagerFactory;
 import io.airlift.airship.agent.DirectoryDeploymentManagerFactory;
@@ -49,6 +50,8 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.collect.Lists.newArrayList;
@@ -56,7 +59,9 @@ import static com.google.common.collect.Lists.newArrayList;
 public class CommanderFactory
 {
     private static final URI FAKE_LOCAL_URI = URI.create("java://localhost");
-    private static final Duration COMMAND_TIMEOUT = new Duration(5, TimeUnit.MINUTES);
+    private static final Duration COMMAND_TIMEOUT = new Duration(1, TimeUnit.SECONDS);
+    private static final Duration STOP_COMMAND_TIMEOUT = new Duration(1, TimeUnit.MINUTES);
+    private static final Duration TAR_COMMAND_TIMEOUT = new Duration(5, TimeUnit.MINUTES);
 
     private String environment;
     private URI coordinatorUri;
@@ -70,6 +75,7 @@ public class CommanderFactory
     private String externalAddress;
     private boolean useInternalAddress;
     private boolean allowDuplicateInstallations;
+    private final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("agent-%d").build());
 
     public CommanderFactory setEnvironment(String environment)
     {
@@ -175,7 +181,7 @@ public class CommanderFactory
         //
         String slotsDir = coordinatorUri.getPath();
         String agentLocation = this.location == null ? Joiner.on('/').join("", "local", agentId, "agent") : location;
-        DeploymentManagerFactory deploymentManagerFactory = new DirectoryDeploymentManagerFactory(agentLocation, slotsDir, COMMAND_TIMEOUT);
+        DeploymentManagerFactory deploymentManagerFactory = new DirectoryDeploymentManagerFactory(agentLocation, slotsDir, TAR_COMMAND_TIMEOUT);
 
         LifecycleManager lifecycleManager = new LauncherLifecycleManager(
                 environment,
@@ -183,7 +189,7 @@ public class CommanderFactory
                 externalAddress,
                 null,
                 COMMAND_TIMEOUT,
-                COMMAND_TIMEOUT,
+                STOP_COMMAND_TIMEOUT,
                 new File(slotsDir, "service-inventory.json").toURI());
 
         Agent agent = new Agent(agentId,
@@ -194,7 +200,9 @@ public class CommanderFactory
                 null,
                 deploymentManagerFactory,
                 lifecycleManager,
-                COMMAND_TIMEOUT);
+                new Duration(0, TimeUnit.MILLISECONDS),
+                COMMAND_TIMEOUT,
+                executor);
 
         //
         // Create coordinator

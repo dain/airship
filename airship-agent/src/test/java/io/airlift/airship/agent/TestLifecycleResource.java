@@ -67,78 +67,78 @@ public class TestLifecycleResource
     {
 
         // default state is stopped
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.start => running
         assertOkResponse(resource.setState(null, slot.getId(), "running"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.start => running
         assertOkResponse(resource.setState(null, slot.getId(), "running"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.stop => stopped
         assertOkResponse(resource.setState(null, slot.getId(), "stopped"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.stop => stopped
         assertOkResponse(resource.setState(null, slot.getId(), "stopped"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.restart => running
         assertOkResponse(resource.setState(null, slot.getId(), "restarting"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.restart => running
         assertOkResponse(resource.setState(null, slot.getId(), "restarting"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.kill => stopped
         assertOkResponse(resource.setState(null, slot.getId(), "killing"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.kill => stopped
         assertOkResponse(resource.setState(null, slot.getId(), "killing"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
     }
 
     @Test
     public void testStateMachineWithVersions()
     {
         // default state is stopped
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.start => running
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "running"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.start => running
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "running"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.stop => stopped
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "stopped"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.stop => stopped
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "stopped"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.restart => running
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "restarting"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.restart => running
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "restarting"), RUNNING);
-        assertEquals(slot.status().getState(), RUNNING);
+        assertEquals(slot.updateStatus().getState(), RUNNING);
 
         // running.kill => stopped
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "killing"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
 
         // stopped.kill => stopped
         assertOkResponse(resource.setState(slot.status().getVersion(), slot.getId(), "killing"), STOPPED);
-        assertEquals(slot.status().getState(), STOPPED);
+        assertEquals(slot.updateStatus().getState(), STOPPED);
     }
 
     @Test

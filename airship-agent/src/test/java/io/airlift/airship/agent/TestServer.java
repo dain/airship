@@ -131,7 +131,7 @@ public class TestServer
     public void resetState()
     {
         for (Slot slot : agent.getAllSlots()) {
-            if (slot.status().getAssignment() != null) {
+            if (slot.updateStatus().getAssignment() != null) {
                 slot.stop();
             }
             agent.terminateSlot(slot.getId());
@@ -237,6 +237,7 @@ public class TestServer
 
         assertEquals(response.getStatusCode(), Status.CREATED.getStatusCode());
         Slot slot = agent.getAllSlots().iterator().next();
+        SlotStatus status = slot.updateStatus();
         assertEquals(response.getHeader(HttpHeaders.LOCATION), uriBuilderFrom(server.getBaseUrl()).appendPath("/v1/agent/slot/").appendPath(slot.getId().toString()).toString());
         assertEquals(response.getHeader(CONTENT_TYPE), MediaType.APPLICATION_JSON);
 
@@ -249,11 +250,11 @@ public class TestServer
                 .put("shortConfig", appleInstallation.getAssignment().getConfig())
                 .put("self", urlFor(slot).toASCIIString())
                 .put("externalUri", urlFor(slot).toASCIIString())
-                .put("location", slot.status().getLocation())
-                .put("shortLocation", slot.status().getLocation())
+                .put("location", status.getLocation())
+                .put("shortLocation", status.getLocation())
                 .put("status", STOPPED.toString())
-                .put("version", slot.status().getVersion())
-                .put("installPath", slot.status().getInstallPath())
+                .put("version", status.getVersion())
+                .put("installPath", status.getInstallPath())
                 .put("resources", ImmutableMap.<String, Integer>of("memory", 512))
                 .build();
 

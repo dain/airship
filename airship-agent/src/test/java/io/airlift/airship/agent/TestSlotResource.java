@@ -145,7 +145,7 @@ public class TestSlotResource
         assertEquals(response.getStatus(), Response.Status.CREATED.getStatusCode());
         assertEquals(response.getMetadata().getFirst(HttpHeaders.LOCATION), URI.create("http://localhost/v1/agent/slot/" + slot.getId().toString()));
 
-        SlotStatus status = slot.status();
+        SlotStatus status = slot.updateStatus();
         SlotStatus expectedStatus = status.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status.getResources());
         assertEquals(response.getEntity(), SlotStatusRepresentation.from(expectedStatus));
         assertEquals(response.getMetadata().get(AIRSHIP_AGENT_VERSION_HEADER).get(0), agent.getAgentStatus().getVersion());

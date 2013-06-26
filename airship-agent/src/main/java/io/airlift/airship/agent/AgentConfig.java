@@ -13,9 +13,9 @@
  */
 package io.airlift.airship.agent;
 
-import com.google.common.base.Preconditions;
 import io.airlift.configuration.Config;
 import io.airlift.units.Duration;
+import io.airlift.units.MinDuration;
 
 import javax.validation.constraints.NotNull;
 import java.util.concurrent.TimeUnit;
@@ -25,8 +25,9 @@ public class AgentConfig
     private String slotsDir = "slots";
     private String resourcesFile = "etc/resources.properties";
     private Duration launcherTimeout = new Duration(5, TimeUnit.SECONDS);
-    private Duration launcherStopTimeout = new Duration(15, TimeUnit.SECONDS);
+    private Duration launcherStopTimeout = new Duration(1, TimeUnit.SECONDS);
     private Duration tarTimeout = new Duration(1, TimeUnit.MINUTES);
+    private Duration updateInterval = new Duration(5, TimeUnit.SECONDS);
     private Duration maxLockWait = new Duration(1, TimeUnit.SECONDS);
 
     @NotNull
@@ -55,6 +56,7 @@ public class AgentConfig
         return this;
     }
 
+    @MinDuration("1ms")
     @NotNull
     public Duration getLauncherTimeout()
     {
@@ -68,6 +70,7 @@ public class AgentConfig
         return this;
     }
 
+    @MinDuration("1ms")
     @NotNull
     public Duration getLauncherStopTimeout()
     {
@@ -81,6 +84,7 @@ public class AgentConfig
         return this;
     }
 
+    @MinDuration("1ms")
     @NotNull
     public Duration getTarTimeout()
     {
@@ -95,6 +99,20 @@ public class AgentConfig
     }
 
     @NotNull
+    public Duration getUpdateInterval()
+    {
+        return updateInterval;
+    }
+
+    @Config("agent.update-interval")
+    public AgentConfig setUpdateInterval(Duration updateInterval)
+    {
+        this.updateInterval = updateInterval;
+        return this;
+    }
+
+    @MinDuration("1ms")
+    @NotNull
     public Duration getMaxLockWait()
     {
         return maxLockWait;
@@ -103,10 +121,6 @@ public class AgentConfig
     @Config("agent.max-lock-wait")
     public AgentConfig setMaxLockWait(Duration lockWait)
     {
-        // TODO: remove once configuration supports bean validation
-        Preconditions.checkNotNull(lockWait, "ttl must not be null");
-        Preconditions.checkArgument(lockWait.toMillis() > 0, "ttl must be > 0");
-
         this.maxLockWait = lockWait;
         return this;
     }

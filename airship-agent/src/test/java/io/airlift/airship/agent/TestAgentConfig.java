@@ -30,8 +30,9 @@ public class TestAgentConfig
                 .setSlotsDir("slots")
                 .setResourcesFile("etc/resources.properties")
                 .setLauncherTimeout(new Duration(5, TimeUnit.SECONDS))
-                .setLauncherStopTimeout(new Duration(15, TimeUnit.SECONDS))
+                .setLauncherStopTimeout(new Duration(1, TimeUnit.SECONDS))
                 .setTarTimeout(new Duration(1, TimeUnit.MINUTES))
+                .setUpdateInterval(new Duration(5, TimeUnit.SECONDS))
                 .setMaxLockWait(new Duration(1, TimeUnit.SECONDS))
         );
     }
@@ -45,6 +46,7 @@ public class TestAgentConfig
                 .put("agent.launcher-timeout", "5m")
                 .put("agent.launcher-stop-timeout", "50m")
                 .put("agent.tar-timeout", "10m")
+                .put("agent.update-interval", "30s")
                 .put("agent.max-lock-wait", "1m")
                 .build();
 
@@ -54,6 +56,7 @@ public class TestAgentConfig
                 .setLauncherTimeout(new Duration(5, TimeUnit.MINUTES))
                 .setLauncherStopTimeout(new Duration(50, TimeUnit.MINUTES))
                 .setTarTimeout(new Duration(10, TimeUnit.MINUTES))
+                .setUpdateInterval(new Duration(30, TimeUnit.SECONDS))
                 .setMaxLockWait(new Duration(1, TimeUnit.MINUTES));
 
         ConfigAssertions.assertFullMapping(properties, expected);

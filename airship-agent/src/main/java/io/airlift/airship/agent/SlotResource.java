@@ -31,6 +31,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 import java.net.URI;
 import java.util.List;
@@ -90,7 +91,13 @@ public class SlotResource
         checkAgentVersion(agent.getAgentStatus(), agentVersion);
         checkSlotVersion(slot.status(), slotVersion);
 
-        SlotStatus slotStatus = agent.terminateSlot(slotId);
+        SlotStatus slotStatus = null;
+        try {
+            slotStatus = agent.terminateSlot(slotId);
+        }
+        catch (IllegalStateException e) {
+            return Response.status(Status.CONFLICT).build();
+        }
         if (slotStatus == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
         }

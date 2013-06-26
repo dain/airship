@@ -373,7 +373,7 @@ public class MockLocalProvisioner implements Provisioner
         {
             if (agentServer != null) {
                 for (Slot slot : agent.getAllSlots()) {
-                    if (slot.status().getAssignment() != null) {
+                    if (slot.updateStatus().getAssignment() != null) {
                         slot.stop();
                     }
                     agent.terminateSlot(slot.getId());

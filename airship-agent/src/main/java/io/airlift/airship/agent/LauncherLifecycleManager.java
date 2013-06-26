@@ -152,6 +152,7 @@ public class LauncherLifecycleManager implements LifecycleManager
 
         File launcherScript = new File(new File(deployment.getDeploymentDir(), "bin"), "launcher");
 
+//        Command command = new Command("/bin/bash", "-c", "exec " + launcherScript.getAbsolutePath() + " " + commandName + " >/dev/null 2>&1")
         Command command = new Command(launcherScript.getAbsolutePath(), commandName)
                 .setDirectory(deployment.getDataDir())
                 .setTimeLimit(timeLimit)

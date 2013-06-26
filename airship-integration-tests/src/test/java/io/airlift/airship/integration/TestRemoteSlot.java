@@ -142,7 +142,7 @@ public class TestRemoteSlot
     public void resetState()
     {
         for (Slot slot : agent.getAllSlots()) {
-            if (slot.status().getAssignment() != null) {
+            if (slot.updateStatus().getAssignment() != null) {
                 slot.stop();
             }
             agent.terminateSlot(slot.getId());
@@ -173,8 +173,9 @@ public class TestRemoteSlot
     public void testGetSlotStatus()
             throws Exception
     {
-        RemoteSlot remoteSlot = new HttpRemoteSlot(slot.status(), client, remoteAgent);
-        assertEquals(remoteSlot.status(), slot.status());
+        SlotStatus status = slot.updateStatus();
+        RemoteSlot remoteSlot = new HttpRemoteSlot(status, client, remoteAgent);
+        assertEquals(remoteSlot.status(), status);
     }
 
     @Test
@@ -182,17 +183,16 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
-        SlotStatus status1 = slot.status();
-        assertEquals(slot.status(), status1.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status1.getResources()));
+        SlotStatus status = slot.updateStatus();
+        assertEquals(status.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status.getResources()), slot.updateStatus());
 
         // test
         remoteAgent.setStatus(agent.getAgentStatus());
-        RemoteSlot remoteSlot = new HttpRemoteSlot(slot.status(), client, remoteAgent);
+        RemoteSlot remoteSlot = new HttpRemoteSlot(status, client, remoteAgent);
         SlotStatus actual = remoteSlot.assign(BANANA_INSTALLATION);
 
         // verify
-        SlotStatus status = slot.status();
-        SlotStatus expected = status.changeAssignment(STOPPED, BANANA_ASSIGNMENT, status.getResources());
+        SlotStatus expected = status.changeAssignment(STOPPED, BANANA_ASSIGNMENT, remoteSlot.status().getResources());
         assertEquals(actual, expected);
     }
 
@@ -201,19 +201,20 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
+        SlotStatus status = slot.updateStatus();
         assertEquals(slot.assign(APPLE_INSTALLATION, new Progress()).getAssignment(), APPLE_ASSIGNMENT);
+        remoteAgent.setStatus(agent.getAgentStatus());
+        RemoteSlot remoteSlot = new HttpRemoteSlot(status, client, remoteAgent);
 
         // test
-        remoteAgent.setStatus(agent.getAgentStatus());
-        RemoteSlot remoteSlot = new HttpRemoteSlot(slot.status(), client, remoteAgent);
         SlotStatus actual = remoteSlot.terminate();
 
         // verify
         SlotStatus expected = createSlotStatus(slot.getId(),
                 slot.getSelf(),
                 slot.getExternalUri(),
-                slot.status().getInstanceId(),
-                slot.status().getLocation(),
+                status.getInstanceId(),
+                status.getLocation(),
                 TERMINATED,
                 null,
                 null,
@@ -226,15 +227,15 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
+        SlotStatus status = slot.updateStatus();
         assertEquals(slot.assign(APPLE_INSTALLATION, new Progress()).getState(), STOPPED);
+        remoteAgent.setStatus(agent.getAgentStatus());
+        RemoteSlot remoteSlot = new HttpRemoteSlot(status, client, remoteAgent);
 
         // test
-        remoteAgent.setStatus(agent.getAgentStatus());
-        RemoteSlot remoteSlot = new HttpRemoteSlot(slot.status(), client, remoteAgent);
         SlotStatus actual = remoteSlot.start();
 
         // verify
-        SlotStatus status = slot.status();
         SlotStatus expected = status.changeAssignment(RUNNING, APPLE_ASSIGNMENT, status.getResources());
         assertEquals(actual, expected);
     }
@@ -244,16 +245,17 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
+        slot.updateStatus();
         slot.assign(APPLE_INSTALLATION, new Progress());
-        assertEquals(slot.start().getState(), RUNNING);
+        SlotStatus status = slot.start();
+        assertEquals(status.getState(), RUNNING);
+        remoteAgent.setStatus(agent.getAgentStatus());
+        RemoteSlot remoteSlot = new HttpRemoteSlot(status, client, remoteAgent);
 
         // test
-        remoteAgent.setStatus(agent.getAgentStatus());
-        RemoteSlot remoteSlot = new HttpRemoteSlot(slot.status(), client, remoteAgent);
         SlotStatus actual = remoteSlot.stop();
 
         // verify
-        SlotStatus status = slot.status();
         SlotStatus expected = status.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status.getResources());
         assertEquals(actual, expected);
     }
@@ -263,16 +265,16 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
+        SlotStatus status = slot.updateStatus();
         slot.assign(APPLE_INSTALLATION, new Progress());
         assertEquals(slot.start().getState(), RUNNING);
+        remoteAgent.setStatus(agent.getAgentStatus());
+        RemoteSlot remoteSlot = new HttpRemoteSlot(status, client, remoteAgent);
 
         // test
-        remoteAgent.setStatus(agent.getAgentStatus());
-        RemoteSlot remoteSlot = new HttpRemoteSlot(slot.status(), client, remoteAgent);
         SlotStatus actual = remoteSlot.kill();
 
         // verify
-        SlotStatus status = slot.status();
         SlotStatus expected = status.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status.getResources());
         assertEquals(actual, expected);
     }
@@ -282,15 +284,15 @@ public class TestRemoteSlot
             throws Exception
     {
         // setup
+        SlotStatus status = slot.updateStatus();
         assertEquals(slot.assign(APPLE_INSTALLATION, new Progress()).getState(), STOPPED);
+        remoteAgent.setStatus(agent.getAgentStatus());
+        RemoteSlot remoteSlot = new HttpRemoteSlot(status, client, remoteAgent);
 
         // test
-        remoteAgent.setStatus(agent.getAgentStatus());
-        RemoteSlot remoteSlot = new HttpRemoteSlot(slot.status(), client, remoteAgent);
         SlotStatus actual = remoteSlot.restart();
 
         // verify
-        SlotStatus status = slot.status();
         SlotStatus expected = status.changeAssignment(RUNNING, APPLE_ASSIGNMENT, status.getResources());
         assertEquals(actual, expected);
     }

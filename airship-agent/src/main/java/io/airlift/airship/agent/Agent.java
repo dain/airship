@@ -50,12 +50,14 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.airship.agent.DeploymentSlot.createNewDeploymentSlot;
+import static io.airlift.airship.agent.DeploymentSlot.loadDeploymentSlot;
 import static io.airlift.airship.shared.AgentLifecycleState.ONLINE;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
@@ -69,13 +71,14 @@ public class Agent
     private final LifecycleManager lifecycleManager;
     private final String location;
     private final Map<String, Integer> resources;
+    private final Duration updateInterval;
     private final Duration maxLockWait;
     private final URI internalUri;
     private final URI externalUri;
 
     private final ConcurrentMap<SlotJobId, SlotJobExecution> jobs = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, SlotJobId> lockedSlots = new ConcurrentHashMap<>();
-    private final Executor executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("slot-job-%d").build());
+    private final ExecutorService executor;
 
     @Inject
     public Agent(AgentConfig config,
@@ -92,7 +95,9 @@ public class Agent
                 config.getResourcesFile(),
                 deploymentManagerFactory,
                 lifecycleManager,
-                config.getMaxLockWait()
+                config.getUpdateInterval(),
+                config.getMaxLockWait(),
+                Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("agent-%d").build())
         );
     }
 
@@ -105,7 +110,9 @@ public class Agent
             String resourcesFilename,
             DeploymentManagerFactory deploymentManagerFactory,
             LifecycleManager lifecycleManager,
-            Duration maxLockWait)
+            Duration updateInterval,
+            Duration maxLockWait,
+            ExecutorService executor)
     {
         checkNotNull(agentId, "agentId is null");
         checkNotNull(location, "location is null");
@@ -119,11 +126,14 @@ public class Agent
         this.agentId = agentId;
         this.internalUri = internalUri;
         this.externalUri = externalUri;
+        this.updateInterval = updateInterval;
         this.maxLockWait = maxLockWait;
         this.location = location;
 
         this.deploymentManagerFactory = deploymentManagerFactory;
         this.lifecycleManager = lifecycleManager;
+
+        this.executor = executor;
 
         slots = new ConcurrentHashMap<>();
 
@@ -140,7 +150,7 @@ public class Agent
             UUID slotId = deploymentManager.getSlotId();
             URI slotInternalUri = uriBuilderFrom(internalUri).appendPath("/v1/agent/slot/").appendPath(slotId.toString()).build();
             URI slotExternalUri = uriBuilderFrom(externalUri).appendPath("/v1/agent/slot/").appendPath(slotId.toString()).build();
-            Slot slot = new DeploymentSlot(slotInternalUri, slotExternalUri, deploymentManager, lifecycleManager, maxLockWait, executor);
+            Slot slot = loadDeploymentSlot(slotInternalUri, slotExternalUri, deploymentManager, lifecycleManager, this.updateInterval, maxLockWait, this.executor);
             slots.put(slotId, slot);
         }
 
@@ -220,7 +230,7 @@ public class Agent
 
         URI slotInternalUri = uriBuilderFrom(internalUri).appendPath("/v1/agent/slot/").appendPath(slotId.toString()).build();
         URI slotExternalUri = uriBuilderFrom(externalUri).appendPath("/v1/agent/slot/").appendPath(slotId.toString()).build();
-        Slot slot = new DeploymentSlot(slotInternalUri, slotExternalUri, deploymentManager, lifecycleManager, installation, maxLockWait, executor);
+        Slot slot = createNewDeploymentSlot(slotInternalUri, slotExternalUri, deploymentManager, lifecycleManager, installation, updateInterval, maxLockWait, executor);
 
         // lock the slot
         if (slotJobId != null) {
@@ -229,7 +239,7 @@ public class Agent
         slots.put(slotId, slot);
 
         // return last slot status
-        return slot.getLastSlotStatus();
+        return slot.status();
     }
 
     public SlotStatus terminateSlot(UUID slotId)

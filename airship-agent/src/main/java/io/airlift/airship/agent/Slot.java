@@ -1,5 +1,6 @@
 package io.airlift.airship.agent;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotStatus;
 
@@ -21,6 +22,9 @@ public interface Slot
     SlotStatus getLastSlotStatus();
 
     SlotStatus status();
+
+    @VisibleForTesting
+    SlotStatus updateStatus();
 
     SlotStatus start();
 

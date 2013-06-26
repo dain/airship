@@ -1,6 +1,7 @@
 package io.airlift.airship.agent.job;
 
 import com.google.common.base.Function;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import io.airlift.airship.agent.Agent;
 import io.airlift.airship.agent.Progress;
@@ -123,8 +124,9 @@ public class SlotJobExecution
                         state.set(SlotJobState.FAILED);
                     }
                 }
-                catch (Exception e) {
+                catch (Throwable e) {
                     state.set(SlotJobState.FAILED);
+                    Throwables.propagateIfInstanceOf(e, Error.class);
                 }
             }
         }

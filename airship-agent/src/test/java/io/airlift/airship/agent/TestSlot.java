@@ -21,6 +21,7 @@ import org.testng.annotations.Test;
 import java.net.URI;
 import java.util.concurrent.Executors;
 
+import static io.airlift.airship.agent.DeploymentSlot.createNewDeploymentSlot;
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
 import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
 import static io.airlift.airship.shared.AssignmentHelper.BANANA_ASSIGNMENT;
@@ -43,18 +44,19 @@ public class TestSlot
         MockDeploymentManager deploymentManager = new MockDeploymentManager();
 
         // create slot with initial apple assignment
-        Slot slot = new DeploymentSlot(URI.create("fake://localhost"),
+        Slot slot = createNewDeploymentSlot(URI.create("fake://localhost"),
                 URI.create("fake://localhost"),
                 deploymentManager,
                 lifecycleManager,
                 APPLE_INSTALLATION,
+                new Duration(0, SECONDS),
                 new Duration(1, SECONDS),
                 Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("slot-job-%d").build()));
-        SlotStatus status = slot.status();
+        SlotStatus status = slot.updateStatus();
         assertNotNull(status);
         assertEquals(status.getAssignment(), APPLE_ASSIGNMENT);
         assertEquals(status.getState(), STOPPED);
-        assertEquals(slot.status(), status);
+        assertEquals(slot.updateStatus(), status);
         assertTrue(lifecycleManager.getNodeConfigUpdated().contains(deploymentManager.getDeployment().getNodeId()));
 
         // assign banana and verify state
@@ -62,7 +64,7 @@ public class TestSlot
         assertNotNull(status);
         assertEquals(status.getAssignment(), BANANA_ASSIGNMENT);
         assertEquals(status.getState(), STOPPED);
-        assertEquals(slot.status(), status);
+        assertEquals(slot.updateStatus(), status);
         assertTrue(lifecycleManager.getNodeConfigUpdated().contains(deploymentManager.getDeployment().getNodeId()));
 
         // terminate and verify terminated
@@ -70,23 +72,24 @@ public class TestSlot
         assertNotNull(status);
         assertEquals(status.getAssignment(), null);
         assertEquals(status.getState(), TERMINATED);
-        assertEquals(slot.status(), status);
+        assertEquals(slot.updateStatus(), status);
     }
 
     @Test
     public void testLifecycle()
             throws Exception
     {
-        Slot slot = new DeploymentSlot(URI.create("fake://localhost"),
+        Slot slot = createNewDeploymentSlot(URI.create("fake://localhost"),
                 URI.create("fake://localhost"),
                 new MockDeploymentManager(),
                 new MockLifecycleManager(),
                 APPLE_INSTALLATION,
+                new Duration(0, SECONDS),
                 new Duration(1, SECONDS),
                 Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("slot-job-%d").build()));
-        SlotStatus status1 = slot.status();
+        SlotStatus status1 = slot.updateStatus();
         SlotStatus running = status1.changeAssignment(RUNNING, APPLE_ASSIGNMENT, status1.getResources());
-        SlotStatus status = slot.status();
+        SlotStatus status = slot.updateStatus();
         SlotStatus stopped = status.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status.getResources());
 
         // assign => stopped
@@ -94,35 +97,34 @@ public class TestSlot
 
         // stopped.start => running
         assertEquals(slot.start(), running);
-        assertEquals(slot.status(), running);
+        assertEquals(slot.updateStatus(), running);
 
         // running.start => running
         assertEquals(slot.start(), running);
-        assertEquals(slot.status(), running);
+        assertEquals(slot.updateStatus(), running);
 
         // running.stop => stopped
         assertEquals(slot.stop(), stopped);
-        assertEquals(slot.status(), stopped);
+        assertEquals(slot.updateStatus(), stopped);
 
         // stopped.stop => stopped
         assertEquals(slot.stop(), stopped);
-        assertEquals(slot.status(), stopped);
+        assertEquals(slot.updateStatus(), stopped);
 
         // stopped.restart => running
         assertEquals(slot.restart(), running);
-        assertEquals(slot.status(), running);
+        assertEquals(slot.updateStatus(), running);
 
         // running.restart => running
         assertEquals(slot.restart(), running);
-        assertEquals(slot.status(), running);
+        assertEquals(slot.updateStatus(), running);
 
         // running.kill => stopped
         assertEquals(slot.kill(), stopped);
-        assertEquals(slot.status(), stopped);
+        assertEquals(slot.updateStatus(), stopped);
 
         // stopped.kill => stopped
         assertEquals(slot.kill(), stopped);
-        assertEquals(slot.status(), stopped);
-
+        assertEquals(slot.updateStatus(), stopped);
     }
 }

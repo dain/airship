@@ -32,6 +32,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
 import static io.airlift.airship.shared.SlotLifecycleState.UNKNOWN;
@@ -46,20 +47,60 @@ public class DeploymentSlot
     private final String location;
     private final URI self;
     private final URI externalUri;
+    private final Duration updateInterval;
     private final Duration lockWait;
     private final DeploymentManager deploymentManager;
     private final LifecycleManager lifecycleManager;
     private final StateMachine<SlotStatus> lastSlotStatus;
+    private final Executor executor;
     private boolean terminated;
 
     private final ReentrantLock lock = new ReentrantLock();
     private volatile Thread lockOwner;
     private volatile List<StackTraceElement> lockAcquisitionLocation;
 
-    public DeploymentSlot(URI self,
+    public static DeploymentSlot createNewDeploymentSlot(URI self,
             URI externalUri,
             DeploymentManager deploymentManager,
             LifecycleManager lifecycleManager,
+            Installation installation,
+            Duration updateInterval,
+            Duration maxLockWait,
+            Executor executor)
+    {
+        DeploymentSlot deploymentSlot = new DeploymentSlot(self, externalUri, deploymentManager, lifecycleManager, updateInterval, maxLockWait, executor);
+
+        // install the software
+        try {
+            deploymentSlot.assign(installation, new Progress());
+            deploymentSlot.startUpdateLoop();
+            return deploymentSlot;
+        }
+        catch (Exception e) {
+            deploymentSlot.terminate();
+            throw Throwables.propagate(e);
+        }
+
+    }
+
+    public static DeploymentSlot loadDeploymentSlot(URI self,
+            URI externalUri,
+            DeploymentManager deploymentManager,
+            LifecycleManager lifecycleManager,
+            Duration updateInterval,
+            Duration maxLockWait,
+            Executor executor)
+    {
+        DeploymentSlot deploymentSlot = new DeploymentSlot(self, externalUri, deploymentManager, lifecycleManager, updateInterval, maxLockWait, executor);
+        deploymentSlot.startUpdateLoop();
+        return deploymentSlot;
+    }
+
+    private DeploymentSlot(URI self,
+            URI externalUri,
+            DeploymentManager deploymentManager, 
+            LifecycleManager lifecycleManager, 
+            Duration updateInterval,
             Duration maxLockWait,
             Executor executor)
     {
@@ -74,11 +115,13 @@ public class DeploymentSlot
         this.deploymentManager = deploymentManager;
         this.lifecycleManager = lifecycleManager;
 
-        lockWait = maxLockWait;
-        id = deploymentManager.getSlotId();
+        this.updateInterval = updateInterval;
+        this.lockWait = maxLockWait;
+        this.id = deploymentManager.getSlotId();
         this.self = self;
         this.externalUri = externalUri;
         this.lastSlotStatus = new StateMachine<>("slot " + id, executor, null);
+        this.executor = executor;
 
         Deployment deployment = deploymentManager.getDeployment();
         if (deployment == null) {
@@ -106,53 +149,42 @@ public class DeploymentSlot
         }
     }
 
-    public DeploymentSlot(URI self,
-            URI externalUri,
-            DeploymentManager deploymentManager,
-            LifecycleManager lifecycleManager,
-            Installation installation,
-            Duration maxLockWait,
-            Executor executor)
+    public void startUpdateLoop()
     {
-        checkNotNull(deploymentManager, "deploymentManager is null");
-        checkNotNull(lifecycleManager, "lifecycleManager is null");
-        checkNotNull(installation, "installation is null");
-        checkNotNull(maxLockWait, "maxLockWait is null");
+        if (updateInterval.toMillis() >= 1) {
+            executor.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    String originalThreadName = Thread.currentThread().getName();
+                    try {
+                        Thread.currentThread().setName("slot-update-" + id);
 
-        this.location = deploymentManager.getLocation();
-        this.deploymentManager = deploymentManager;
-        this.lifecycleManager = lifecycleManager;
+                        while (!Thread.currentThread().isInterrupted()) {
+                            try {
+                                SlotStatus status = updateStatus();
+                                if (status.getState() == TERMINATED || Thread.currentThread().isInterrupted()) {
+                                    return;
+                                }
+                            }
+                            catch (Throwable e) {
+                                log.warn(e, "Error updating status of %s", id);
+                            }
 
-        this.lockWait = maxLockWait;
-        this.id = deploymentManager.getSlotId();
-        this.self = self;
-        this.externalUri = externalUri;
-
-        // install the software
-        try {
-            // deploy new server
-            deploymentManager.install(installation, new Progress());
-
-            // create node config file
-            Deployment deployment = deploymentManager.getDeployment();
-            lifecycleManager.updateNodeConfig(deployment);
-
-            // set initial status
-            lastSlotStatus = new StateMachine<>("slot " + id,
-                    executor,
-                    createSlotStatus(id,
-                            self,
-                            externalUri,
-                            null,
-                            location,
-                            STOPPED,
-                            installation.getAssignment(),
-                            deployment.getDataDir().getAbsolutePath(),
-                            deployment.getResources()));
-        }
-        catch (Exception e) {
-            deploymentManager.terminate();
-            throw Throwables.propagate(e);
+                            try {
+                                TimeUnit.MILLISECONDS.sleep((long) updateInterval.toMillis());
+                            }
+                            catch (InterruptedException e) {
+                                return;
+                            }
+                        }
+                    }
+                    finally {
+                        Thread.currentThread().setName(originalThreadName);
+                    }
+                }
+            });
         }
     }
 
@@ -185,9 +217,9 @@ public class DeploymentSlot
             checkState(!terminated, "Slot has been terminated");
 
             progress.reset("Checking status");
-            SlotStatus status = status();
-
-            checkState(status.getState() == STOPPED, "Slot is not stopped");
+            // check current actual status
+            SlotStatus status = updateStatus();
+            checkState(status.getState() == STOPPED || status.getState() == UNKNOWN, "Slot is not stopped, but is %s", status.getState());
 
             log.info("Becoming %s with %s", installation.getAssignment().getBinary(), installation.getAssignment().getConfig());
 
@@ -221,12 +253,9 @@ public class DeploymentSlot
         lock();
         try {
             if (!terminated) {
-
-                SlotStatus status = status();
-                if ((status.getState() != STOPPED) && (deploymentManager.getDeployment() != null)) {
-                    // slot is not stopped and deployment still exists
-                    return status;
-                }
+                // verify current actual status
+                SlotStatus status = updateStatus();
+                checkState(status.getState() == STOPPED || deploymentManager.getDeployment() == null, "Slot is not stopped, but is %s", status.getState());
 
                 // terminate the slot
                 deploymentManager.terminate();
@@ -251,6 +280,11 @@ public class DeploymentSlot
     @Override
     public SlotStatus status()
     {
+        return lastSlotStatus.get();
+    }
+
+    public SlotStatus updateStatus()
+    {
         try {
             lock();
         }
@@ -270,7 +304,8 @@ public class DeploymentSlot
                 return lastSlotStatus.get().changeAssignment(UNKNOWN, null, ImmutableMap.<String, Integer>of());
             }
 
-            SlotStatus slotStatus = lastSlotStatus.get().changeState(lifecycleManager.status(activeDeployment));
+            SlotLifecycleState status = lifecycleManager.status(activeDeployment);
+            SlotStatus slotStatus = lastSlotStatus.get().changeState(status);
             lastSlotStatus.set(slotStatus);
             return slotStatus;
         }
@@ -290,7 +325,7 @@ public class DeploymentSlot
         }
 
         SlotLifecycleState state = lifecycleManager.start(activeDeployment);
-
+        checkState(state == RUNNING, "Start failed");
         SlotStatus slotStatus = lastSlotStatus.get().changeState(state);
         lastSlotStatus.set(slotStatus);
         return slotStatus;

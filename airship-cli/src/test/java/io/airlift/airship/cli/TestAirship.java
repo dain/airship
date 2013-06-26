@@ -29,6 +29,7 @@ import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 public class TestAirship
 {
@@ -193,7 +194,13 @@ public class TestAirship
         assertNull(outputFormat.coordinators);
         assertNull(outputFormat.agents);
 
-        execute("terminate", "-c", APPLE_ASSIGNMENT_2.getConfig());
+        try {
+            execute("terminate", "-c", APPLE_ASSIGNMENT_2.getConfig());
+            fail("expected exception");
+        }
+        catch (RuntimeException expected) {
+            assertTrue(expected.getMessage().equalsIgnoreCase("Slot is not stopped, but is RUNNING"));
+        }
 
         assertNotNull(outputFormat.slots);
         assertEquals(outputFormat.slots.size(), 1);

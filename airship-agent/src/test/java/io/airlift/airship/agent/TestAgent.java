@@ -42,7 +42,8 @@ public class TestAgent
 
         AgentConfig config = new AgentConfig()
                 .setSlotsDir(new File(tempDir, "slots").getAbsolutePath())
-                .setResourcesFile(resourcesFile.getAbsolutePath());
+                .setResourcesFile(resourcesFile.getAbsolutePath())
+                .setUpdateInterval(new Duration(0, TimeUnit.MILLISECONDS));
 
         nodeInfo = new NodeInfo("test", "pool", "nodeId", InetAddress.getByAddress(new byte[]{127, 0, 0, 1}), null, null, "location", "binarySpec", "configSpec");
 
@@ -131,11 +132,23 @@ public class TestAgent
         assertNotNull(slotStatus, "slotStatus is null");
         assertEquals(slotStatus.getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
         assertEquals(slotStatus.getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
-        assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString());
+        try {
+            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString());
+        }
+        catch (Throwable t) {
+            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString(), "with update");
+            throw t;
+        }
 
         Slot slot = agent.getSlot(slotStatus.getId());
         assertNotNull(slot, "slot is null");
         assertEquals(slot.getLastSlotStatus().getAssignment(), APPLE_INSTALLATION.getAssignment());
-        assertEquals(slot.getLastSlotStatus().getState(), SlotLifecycleState.RUNNING);
+        try {
+            assertEquals(slot.getLastSlotStatus().getState(), SlotLifecycleState.RUNNING);
+        }
+        catch (Throwable t) {
+            assertEquals(slot.updateStatus().getState(), SlotLifecycleState.RUNNING, "with update");
+            throw t;
+        }
     }
 }
