@@ -41,6 +41,7 @@ import static io.airlift.http.client.Request.Builder.preparePost;
 import static io.airlift.http.client.StatusResponseHandler.createStatusResponseHandler;
 
 public class HttpRemoteSlotJob
+        implements RemoteSlotJob
 {
     private static final Logger log = Logger.get(HttpRemoteSlotJob.class);
 
@@ -101,6 +102,7 @@ public class HttpRemoteSlotJob
         continuousTaskInfoFetcher.start();
     }
 
+    @Override
     public SlotJobStatus getJobStatus()
     {
         return slotJobStatus.get();

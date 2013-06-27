@@ -52,7 +52,7 @@ public class SlotJobStatus
             @JsonProperty("tasks") List<TaskStatus> tasks)
     {
         this.slotJobId = checkNotNull(slotJobId, "id is null");
-        this.self = checkNotNull(self, "self is null");
+        this.self = self;
         this.state = checkNotNull(state, "state is null");
         this.slotStatus = slotStatus;
         this.progressDescription = progressDescription;
