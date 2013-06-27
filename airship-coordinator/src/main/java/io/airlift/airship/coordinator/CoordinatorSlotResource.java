@@ -27,7 +27,6 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -36,6 +35,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -43,10 +43,6 @@ import static com.google.common.collect.Lists.transform;
 import static io.airlift.airship.shared.AgentStatus.idGetter;
 import static io.airlift.airship.shared.SlotStatus.uuidGetter;
 import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENTS_VERSION_HEADER;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_SLOTS_VERSION_HEADER;
-import static io.airlift.airship.shared.VersionsUtil.checkAgentsVersion;
-import static io.airlift.airship.shared.VersionsUtil.createSlotsVersion;
 
 @Path("/v1/slot")
 public class CoordinatorSlotResource
@@ -79,7 +75,6 @@ public class CoordinatorSlotResource
 
         // build response
         return Response.ok(Iterables.transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .header(AIRSHIP_SLOTS_VERSION_HEADER, createSlotsVersion(slots))
                 .build();
     }
 
@@ -89,8 +84,7 @@ public class CoordinatorSlotResource
     public Response install(
             AssignmentRepresentation assignmentRepresentation,
             @DefaultValue("1") @QueryParam("limit") int limit,
-            @Context UriInfo uriInfo,
-            @HeaderParam(AIRSHIP_AGENTS_VERSION_HEADER) String expectedAgentsVersion)
+            @Context UriInfo uriInfo)
     {
         Preconditions.checkNotNull(assignmentRepresentation, "assignmentRepresentation must not be null");
         Preconditions.checkArgument(limit > 0, "limit must be at least 1");
@@ -105,33 +99,27 @@ public class CoordinatorSlotResource
                 repository);
         List<AgentStatus> agents = coordinator.getAgents(agentFilter);
 
-        // verify the expected status of agents
-        checkAgentsVersion(expectedAgentsVersion, agents);
-
         // install the software
         List<SlotStatus> slots = coordinator.install(agentFilter, limit, assignment);
 
         // calculate unique prefix size with the new slots included
         return Response.ok(transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .header(AIRSHIP_SLOTS_VERSION_HEADER, createSlotsVersion(slots))
                 .build();
     }
 
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
-    public Response terminateSlots(@Context UriInfo uriInfo,
-            @HeaderParam(AIRSHIP_SLOTS_VERSION_HEADER) String expectedSlotsVersion)
+    public Response terminateSlots(@Context UriInfo uriInfo)
     {
         // build filter
         List<UUID> uuids = transform(coordinator.getAllSlotStatus(), uuidGetter());
         Predicate<SlotStatus> slotFilter = SlotFilterBuilder.build(uriInfo, true, uuids);
 
         // terminate slots
-        List<SlotStatus> result = coordinator.terminate(slotFilter, expectedSlotsVersion);
+        List<SlotStatus> result = coordinator.terminate(slotFilter, null);
 
         // build response
         return Response.ok(transform(result, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .header(AIRSHIP_SLOTS_VERSION_HEADER, createSlotsVersion(result))
                 .build();
     }
 }

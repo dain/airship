@@ -420,7 +420,7 @@ public class TestServerIntegration
         assertEquals(actual.getSelf(), agentServer.getInstance().getInternalUri());
         assertNotNull(actual.getExternalUri());
         assertEquals(actual.getExternalUri(), agentServer.getInstance().getExternalUri());
-        assertEquals(actual.getResources(), agentServer.getAgent().getResources());
+        assertEquals(actual.getResources(), agentServer.getAgent().getAgentStatus().getResources());
     }
 
     @Test

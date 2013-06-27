@@ -18,7 +18,6 @@ import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.VersionConflictException;
 import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
@@ -29,23 +28,21 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
+
 import java.io.File;
 import java.net.URI;
 import java.util.Collection;
 import java.util.UUID;
 
 import static com.google.common.collect.Lists.newArrayList;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENT_VERSION_HEADER;
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
 import static io.airlift.airship.shared.ExtraAssertions.assertEqualsNoOrder;
 import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_SLOT_VERSION_HEADER;
 import static io.airlift.testing.Assertions.assertInstanceOf;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.fail;
 
 public class TestSlotResource
 {
@@ -79,8 +76,6 @@ public class TestSlotResource
         Response response = resource.getSlotStatus(slotStatus.getId(), MockUriInfo.from(requestUri));
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertEquals(response.getEntity(), SlotStatusRepresentation.from(slotStatus));
-        assertEquals(response.getMetadata().get(AIRSHIP_AGENT_VERSION_HEADER).get(0), agent.getAgentStatus().getVersion());
-        assertEquals(response.getMetadata().get(AIRSHIP_SLOT_VERSION_HEADER).get(0), slotStatus.getVersion());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
     }
 
@@ -104,7 +99,6 @@ public class TestSlotResource
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertInstanceOf(response.getEntity(), Collection.class);
         assertEquals((Collection<?>) response.getEntity(), newArrayList());
-        assertEquals(response.getMetadata().get(AIRSHIP_AGENT_VERSION_HEADER).get(0), agent.getAgentStatus().getVersion());
     }
 
     @Test
@@ -120,7 +114,6 @@ public class TestSlotResource
                 SlotStatusRepresentation.from(slotStatus1),
                 SlotStatusRepresentation.from(slotStatus2)
         ));
-        assertEquals(response.getMetadata().get(AIRSHIP_AGENT_VERSION_HEADER).get(0), agent.getAgentStatus().getVersion());
     }
 
     @Test
@@ -137,7 +130,7 @@ public class TestSlotResource
 
     public void assertInstallSlot(String agentVersion)
     {
-        Response response = resource.installSlot(agentVersion, InstallationRepresentation.from(APPLE_INSTALLATION), uriInfo);
+        Response response = resource.installSlot(InstallationRepresentation.from(APPLE_INSTALLATION), uriInfo);
 
         // find the new slot
         Slot slot = agent.getAllSlots().iterator().next();
@@ -148,28 +141,26 @@ public class TestSlotResource
         SlotStatus status = slot.updateStatus();
         SlotStatus expectedStatus = status.changeAssignment(STOPPED, APPLE_ASSIGNMENT, status.getResources());
         assertEquals(response.getEntity(), SlotStatusRepresentation.from(expectedStatus));
-        assertEquals(response.getMetadata().get(AIRSHIP_AGENT_VERSION_HEADER).get(0), agent.getAgentStatus().getVersion());
-        assertEquals(response.getMetadata().get(AIRSHIP_SLOT_VERSION_HEADER).get(0), expectedStatus.getVersion());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
     }
 
-    @Test
-    public void testInstallInvalidVersion()
-    {
-        try {
-            resource.installSlot("invalid-version", InstallationRepresentation.from(APPLE_INSTALLATION), uriInfo);
-            fail("Expected WebApplicationException");
-        }
-        catch (VersionConflictException e) {
-            assertEquals(e.getName(), AIRSHIP_AGENT_VERSION_HEADER);
-            assertEquals(e.getVersion(), agent.getAgentStatus().getVersion());
-        }
-    }
+//    @Test
+//    public void testInstallInvalidVersion()
+//    {
+//        try {
+//            resource.installSlot(InstallationRepresentation.from(APPLE_INSTALLATION), uriInfo);
+//            fail("Expected WebApplicationException");
+//        }
+//        catch (VersionConflictException e) {
+//            assertEquals(e.getName(), AIRSHIP_AGENT_VERSION_HEADER);
+//            assertEquals(e.getVersion(), agent.getAgentStatus().getVersion());
+//        }
+//    }
 
     @Test(expectedExceptions = NullPointerException.class)
     public void testInstallNullDeployment()
     {
-        resource.installSlot(null, null, uriInfo);
+        resource.installSlot(null, uriInfo);
     }
 
     @Test
@@ -177,13 +168,11 @@ public class TestSlotResource
     {
         SlotStatus slotStatus = agent.install(APPLE_INSTALLATION);
 
-        Response response = resource.terminateSlot(null, null, slotStatus.getId());
+        Response response = resource.terminateSlot(slotStatus.getId());
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
         SlotStatus expectedStatus = slotStatus.changeState(TERMINATED);
         assertEquals(response.getEntity(), SlotStatusRepresentation.from(expectedStatus));
-        assertEquals(response.getMetadata().get(AIRSHIP_AGENT_VERSION_HEADER).get(0), agent.getAgentStatus().getVersion());
-        assertEquals(response.getMetadata().get(AIRSHIP_SLOT_VERSION_HEADER).get(0), expectedStatus.getVersion());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
         assertNull(agent.getSlot(slotStatus.getId()));
@@ -192,13 +181,13 @@ public class TestSlotResource
     @Test
     public void testTerminateUnknownSlot()
     {
-        Response response = resource.terminateSlot(null, null, UUID.randomUUID());
+        Response response = resource.terminateSlot(UUID.randomUUID());
         assertEquals(response.getStatus(), Status.NOT_FOUND.getStatusCode());
     }
 
     @Test(expectedExceptions = NullPointerException.class)
     public void testRemoveSlotNullId()
     {
-        resource.terminateSlot(null, null, null);
+        resource.terminateSlot(null);
     }
 }

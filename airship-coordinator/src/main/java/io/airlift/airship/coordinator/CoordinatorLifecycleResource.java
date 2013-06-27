@@ -21,7 +21,6 @@ import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
 
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -29,14 +28,13 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+
 import java.util.List;
 import java.util.UUID;
 
 import static com.google.common.collect.Collections2.transform;
 import static io.airlift.airship.shared.SlotLifecycleState.UNKNOWN;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_SLOTS_VERSION_HEADER;
 import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
-import static io.airlift.airship.shared.VersionsUtil.createSlotsVersion;
 
 @Path("/v1/slot/lifecycle")
 public class CoordinatorLifecycleResource
@@ -56,9 +54,7 @@ public class CoordinatorLifecycleResource
 
     @PUT
     @Produces(MediaType.APPLICATION_JSON)
-    public Response setState(String newState,
-            @Context UriInfo uriInfo,
-            @HeaderParam(AIRSHIP_SLOTS_VERSION_HEADER) String expectedSlotsVersion)
+    public Response setState(String newState, @Context UriInfo uriInfo)
     {
         Preconditions.checkNotNull(newState, "newState must not be null");
 
@@ -72,11 +68,10 @@ public class CoordinatorLifecycleResource
         Predicate<SlotStatus> slotFilter = SlotFilterBuilder.build(uriInfo, true, uuids);
 
         // set slot state
-        List<SlotStatus> results = coordinator.setState(state, slotFilter, expectedSlotsVersion);
+        List<SlotStatus> results = coordinator.setState(state, slotFilter, null);
 
         // build response
         return Response.ok(transform(results, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .header(AIRSHIP_SLOTS_VERSION_HEADER, createSlotsVersion(results))
                 .build();
      }
 }

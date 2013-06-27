@@ -17,14 +17,13 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
+
 import java.util.List;
 
 import static com.google.common.collect.Lists.transform;
 import static io.airlift.airship.shared.AgentStatus.idGetter;
 import static io.airlift.airship.shared.AgentStatusRepresentation.fromAgentStatus;
 import static io.airlift.airship.shared.CoordinatorStatusRepresentation.fromCoordinatorStatus;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENTS_VERSION_HEADER;
-import static io.airlift.airship.shared.VersionsUtil.createAgentsVersion;
 
 @Path("/v1/admin/")
 public class AdminResource
@@ -84,16 +83,13 @@ public class AdminResource
         List<AgentStatus> agents = coordinator.getAgents(agentPredicate);
 
         return Response.ok(transform(agents, fromAgentStatus(coordinator.getAgents(), repository)))
-                .header(AIRSHIP_AGENTS_VERSION_HEADER, createAgentsVersion(agents))
                 .build();
     }
 
     @POST
     @Path("/agent")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response provisionAgent(
-            AgentProvisioningRepresentation provisioning,
-            @Context UriInfo uriInfo)
+    public Response provisionAgent(AgentProvisioningRepresentation provisioning, @Context UriInfo uriInfo)
             throws Exception
     {
         List<AgentStatus> agents = coordinator.provisionAgents(

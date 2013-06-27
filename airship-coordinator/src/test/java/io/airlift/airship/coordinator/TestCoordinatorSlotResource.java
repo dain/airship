@@ -193,7 +193,7 @@ public class TestCoordinatorSlotResource
         coordinator.updateAllAgentsAndWait();
 
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment?host=apple*");
-        Response response = resource.install(AssignmentRepresentation.from(assignment), limit, uriInfo, null);
+        Response response = resource.install(AssignmentRepresentation.from(assignment), limit, uriInfo);
 
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
@@ -215,7 +215,7 @@ public class TestCoordinatorSlotResource
         coordinator.updateAllAgentsAndWait();
 
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
-        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo, null);
+        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo);
 
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
@@ -235,7 +235,7 @@ public class TestCoordinatorSlotResource
         coordinator.updateAllAgentsAndWait();
 
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
-        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo, null);
+        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo);
 
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
@@ -251,14 +251,14 @@ public class TestCoordinatorSlotResource
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
 
         // install an apple server
-        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo, null);
+        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo);
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         Collection<SlotStatusRepresentation> slots = (Collection<SlotStatusRepresentation>) response.getEntity();
         assertEquals(slots.size(), 1);
         assertAppleSlot(Iterables.get(slots, 0));
 
         // try to install a banana server which will fail
-        response = resource.install(AssignmentRepresentation.from(BANANA_ASSIGNMENT), 1, uriInfo, null);
+        response = resource.install(AssignmentRepresentation.from(BANANA_ASSIGNMENT), 1, uriInfo);
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         response.getEntity();
     }

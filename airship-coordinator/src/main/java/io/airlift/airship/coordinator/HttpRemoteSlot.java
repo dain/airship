@@ -17,8 +17,6 @@ import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.airship.shared.SlotLifecycleState.UNKNOWN;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENT_VERSION_HEADER;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_SLOT_VERSION_HEADER;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
 import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
@@ -81,8 +79,6 @@ public class HttpRemoteSlot implements RemoteSlot
             Request request = Request.Builder.preparePut()
                     .setUri(uriBuilderFrom(slotStatus.getSelf()).appendPath("assignment").build())
                     .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                    .setHeader(AIRSHIP_AGENT_VERSION_HEADER, agent.status().getVersion())
-                    .setHeader(AIRSHIP_SLOT_VERSION_HEADER, slotStatus.getVersion())
                     .setBodyGenerator(jsonBodyGenerator(installationCodec, InstallationRepresentation.from(installation)))
                     .build();
             SlotStatusRepresentation slotStatusRepresentation = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.OK.getStatusCode()));
@@ -102,8 +98,6 @@ public class HttpRemoteSlot implements RemoteSlot
         try {
             Request request = Request.Builder.prepareDelete()
                     .setUri(slotStatus.getSelf())
-                    .setHeader(AIRSHIP_AGENT_VERSION_HEADER, agent.status().getVersion())
-                    .setHeader(AIRSHIP_SLOT_VERSION_HEADER, slotStatus.getVersion())
                     .build();
             SlotStatusRepresentation slotStatusRepresentation = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.OK.getStatusCode()));
 
@@ -122,8 +116,6 @@ public class HttpRemoteSlot implements RemoteSlot
         try {
             Request request = Request.Builder.preparePut()
                     .setUri(uriBuilderFrom(slotStatus.getSelf()).appendPath("lifecycle").build())
-                    .setHeader(AIRSHIP_AGENT_VERSION_HEADER, agent.status().getVersion())
-                    .setHeader(AIRSHIP_SLOT_VERSION_HEADER, slotStatus.getVersion())
                     .setBodyGenerator(createStaticBodyGenerator("running", UTF_8))
                     .build();
             SlotStatusRepresentation slotStatusRepresentation = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.OK.getStatusCode()));
@@ -143,8 +135,6 @@ public class HttpRemoteSlot implements RemoteSlot
         try {
             Request request = Request.Builder.preparePut()
                     .setUri(uriBuilderFrom(slotStatus.getSelf()).appendPath("lifecycle").build())
-                    .setHeader(AIRSHIP_AGENT_VERSION_HEADER, agent.status().getVersion())
-                    .setHeader(AIRSHIP_SLOT_VERSION_HEADER, slotStatus.getVersion())
                     .setBodyGenerator(createStaticBodyGenerator("restarting", UTF_8))
                     .build();
             SlotStatusRepresentation slotStatusRepresentation = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.OK.getStatusCode()));
@@ -164,8 +154,6 @@ public class HttpRemoteSlot implements RemoteSlot
         try {
             Request request = Request.Builder.preparePut()
                     .setUri(uriBuilderFrom(slotStatus.getSelf()).appendPath("lifecycle").build())
-                    .setHeader(AIRSHIP_AGENT_VERSION_HEADER, agent.status().getVersion())
-                    .setHeader(AIRSHIP_SLOT_VERSION_HEADER, slotStatus.getVersion())
                     .setBodyGenerator(createStaticBodyGenerator("stopped", UTF_8))
                     .build();
             SlotStatusRepresentation slotStatusRepresentation = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.OK.getStatusCode()));

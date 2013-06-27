@@ -24,8 +24,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENT_VERSION_HEADER;
-
 @Path("/v1/agent/")
 public class AgentResource
 {
@@ -45,8 +43,6 @@ public class AgentResource
     {
         AgentStatus agentStatus = agent.getAgentStatus();
         AgentStatusRepresentation agentStatusRepresentation = AgentStatusRepresentation.from(agentStatus);
-        return Response.ok(agentStatusRepresentation)
-                .header(AIRSHIP_AGENT_VERSION_HEADER, agentStatus.getVersion())
-                .build();
+        return Response.ok(agentStatusRepresentation).build();
     }
 }

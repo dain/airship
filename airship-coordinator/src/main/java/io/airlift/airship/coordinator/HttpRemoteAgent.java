@@ -38,7 +38,6 @@ import static io.airlift.airship.shared.AgentLifecycleState.OFFLINE;
 import static io.airlift.airship.shared.AgentLifecycleState.ONLINE;
 import static io.airlift.airship.shared.AgentLifecycleState.PROVISIONING;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENT_VERSION_HEADER;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
 import static io.airlift.http.client.StatusResponseHandler.StatusResponse;
@@ -204,7 +203,6 @@ public class HttpRemoteAgent implements RemoteAgent
             Request request = Request.Builder.preparePost()
                     .setUri(uriBuilderFrom(internalUri).replacePath("/v1/agent/slot/").build())
                     .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                    .setHeader(AIRSHIP_AGENT_VERSION_HEADER, status().getVersion())
                     .setBodyGenerator(jsonBodyGenerator(installationCodec, InstallationRepresentation.from(installation)))
                     .build();
             SlotStatusRepresentation slotStatusRepresentation = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.CREATED.getStatusCode()));

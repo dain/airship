@@ -24,8 +24,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_COORDINATOR_VERSION_HEADER;
-
 @Path("/v1/coordinator/")
 public class CoordinatorResource
 {
@@ -45,8 +43,6 @@ public class CoordinatorResource
     {
         CoordinatorStatus coordinatorStatus = coordinator.status();
         CoordinatorStatusRepresentation coordinatorStatusRepresentation = CoordinatorStatusRepresentation.from(coordinatorStatus);
-        return Response.ok(coordinatorStatusRepresentation)
-                .header(AIRSHIP_COORDINATOR_VERSION_HEADER, coordinatorStatus.getVersion())
-                .build();
+        return Response.ok(coordinatorStatusRepresentation).build();
     }
 }

@@ -32,10 +32,8 @@ import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Maps.newHashMap;
 import static io.airlift.airship.cli.CommanderResponse.createCommanderResponse;
 import static io.airlift.airship.cli.HttpCommander.TextBodyGenerator.textBodyGenerator;
+import static io.airlift.airship.shared.AirshipHeaders.AIRSHIP_FORCE_HEADER;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_AGENTS_VERSION_HEADER;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_FORCE_HEADER;
-import static io.airlift.airship.shared.VersionsUtil.AIRSHIP_SLOTS_VERSION_HEADER;
 import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
@@ -75,7 +73,7 @@ public class HttpCommander implements Commander
                 .build();
 
         JsonResponse<List<SlotStatusRepresentation>> response = client.execute(request, createFullJsonResponseHandler(SLOTS_CODEC));
-        return createCommanderResponse(response.getHeader(AIRSHIP_SLOTS_VERSION_HEADER), response.getValue());
+        return createCommanderResponse(null, response.getValue());
     }
 
     @Override
@@ -86,9 +84,6 @@ public class HttpCommander implements Commander
                 .setUri(uri)
                 .setHeader("Content-Type", "application/json")
                 .setBodyGenerator(jsonBodyGenerator(ASSIGNMENT_CODEC, AssignmentRepresentation.from(assignment)));
-        if (expectedVersion != null) {
-            requestBuilder.setHeader(AIRSHIP_SLOTS_VERSION_HEADER, expectedVersion);
-        }
 
         List<SlotStatusRepresentation> slots = client.execute(requestBuilder.build(), createJsonResponseHandler(SLOTS_CODEC));
         return slots;
@@ -102,9 +97,6 @@ public class HttpCommander implements Commander
                 .setUri(uri)
                 .setHeader("Content-Type", "application/json")
                 .setBodyGenerator(jsonBodyGenerator(UPGRADE_VERSIONS_CODEC, upgradeVersions));
-        if (expectedVersion != null) {
-            requestBuilder.setHeader(AIRSHIP_SLOTS_VERSION_HEADER, expectedVersion);
-        }
         if (force) {
             requestBuilder.setHeader(AIRSHIP_FORCE_HEADER, "true");
         }
@@ -120,9 +112,6 @@ public class HttpCommander implements Commander
         Request.Builder requestBuilder = Request.Builder.preparePut()
                 .setUri(uri)
                 .setBodyGenerator(textBodyGenerator(state.name()));
-        if (expectedVersion != null) {
-            requestBuilder.setHeader(AIRSHIP_SLOTS_VERSION_HEADER, expectedVersion);
-        }
 
         List<SlotStatusRepresentation> slots = client.execute(requestBuilder.build(), createJsonResponseHandler(SLOTS_CODEC));
         return slots;
@@ -133,9 +122,6 @@ public class HttpCommander implements Commander
     {
         URI uri = slotFilter.toUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot"));
         Request.Builder requestBuilder = Request.Builder.prepareDelete().setUri(uri);
-        if (expectedVersion != null) {
-            requestBuilder.setHeader(AIRSHIP_SLOTS_VERSION_HEADER, expectedVersion);
-        }
 
         List<SlotStatusRepresentation> slots = client.execute(requestBuilder.build(), createJsonResponseHandler(SLOTS_CODEC));
         return slots;
@@ -146,9 +132,6 @@ public class HttpCommander implements Commander
     {
         URI uri = slotFilter.toUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot/expected-state"));
         Request.Builder requestBuilder = Request.Builder.prepareDelete().setUri(uri);
-        if (expectedVersion != null) {
-            requestBuilder.setHeader(AIRSHIP_SLOTS_VERSION_HEADER, expectedVersion);
-        }
 
         List<SlotStatusRepresentation> slots = client.execute(requestBuilder.build(), createJsonResponseHandler(SLOTS_CODEC));
         return slots;
@@ -285,7 +268,7 @@ public class HttpCommander implements Commander
         if (response.getStatusCode() != 200) {
             throw new RuntimeException(response.getStatusMessage());
         }
-        return CommanderResponse.createCommanderResponse(response.getHeader(AIRSHIP_AGENTS_VERSION_HEADER), response.getValue());
+        return CommanderResponse.createCommanderResponse(null, response.getValue());
     }
 
     @Override
