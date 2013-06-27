@@ -30,12 +30,15 @@ import io.airlift.airship.agent.Progress;
 import io.airlift.airship.agent.Slot;
 import io.airlift.airship.coordinator.HttpRemoteAgent;
 import io.airlift.airship.coordinator.HttpRemoteSlot;
+import io.airlift.airship.coordinator.HttpRemoteSlotJobFactory;
 import io.airlift.airship.coordinator.RemoteSlot;
 import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.job.SlotJob;
+import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.configuration.ConfigurationFactory;
 import io.airlift.configuration.ConfigurationModule;
 import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
@@ -47,7 +50,6 @@ import io.airlift.http.client.netty.NettyIoPool;
 import io.airlift.http.server.testing.TestingHttpServer;
 import io.airlift.http.server.testing.TestingHttpServerModule;
 import io.airlift.jaxrs.JaxrsModule;
-import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonModule;
 import io.airlift.node.testing.TestingNodeModule;
 import org.testng.annotations.AfterClass;
@@ -68,6 +70,7 @@ import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
 import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
+import static io.airlift.json.JsonCodec.jsonCodec;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -131,11 +134,12 @@ public class TestRemoteSlot
         remoteAgent = new HttpRemoteAgent(
                 agent.getAgentStatus(),
                 "test",
+                new HttpRemoteSlotJobFactory(client, jsonCodec(SlotJob.class), jsonCodec(SlotJobStatus.class)),
                 client,
-                JsonCodec.jsonCodec(InstallationRepresentation.class),
-                JsonCodec.jsonCodec(AgentStatusRepresentation.class),
-                JsonCodec.jsonCodec(SlotStatusRepresentation.class),
-                JsonCodec.jsonCodec(ServiceDescriptorsRepresentation.class));
+                jsonCodec(InstallationRepresentation.class),
+                jsonCodec(AgentStatusRepresentation.class),
+                jsonCodec(SlotStatusRepresentation.class),
+                jsonCodec(ServiceDescriptorsRepresentation.class));
     }
 
     @BeforeMethod

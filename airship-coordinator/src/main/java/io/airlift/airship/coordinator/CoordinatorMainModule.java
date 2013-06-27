@@ -28,6 +28,8 @@ import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
 import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.VersionConflictExceptionMapper;
+import io.airlift.airship.shared.job.SlotJob;
+import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.discovery.client.ServiceDescriptor;
 import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
 import io.airlift.http.server.TheServlet;
@@ -57,6 +59,7 @@ public class CoordinatorMainModule
         binder.bind(VersionConflictExceptionMapper.class).in(Scopes.SINGLETON);
         binder.bind(RemoteCoordinatorFactory.class).to(HttpRemoteCoordinatorFactory.class).in(Scopes.SINGLETON);
         binder.bind(RemoteAgentFactory.class).to(HttpRemoteAgentFactory.class).in(Scopes.SINGLETON);
+        binder.bind(HttpRemoteSlotJobFactory.class).in(Scopes.SINGLETON);
 
         binder.bind(Repository.class).to(RepositorySet.class).in(Scopes.SINGLETON);
         Multibinder.newSetBinder(binder, Repository.class).addBinding().to(MavenRepository.class).in(Scopes.SINGLETON);
@@ -78,6 +81,8 @@ public class CoordinatorMainModule
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(ServiceDescriptorsRepresentation.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(ExpectedSlotStatus.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindListJsonCodec(ServiceDescriptor.class);
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(SlotJob.class);
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(SlotJobStatus.class);
 
         bindConfig(binder).to(CoordinatorConfig.class);
 

@@ -47,6 +47,11 @@ public class StateMachine<T>
         this.state = initialState;
     }
 
+    public String getName()
+    {
+        return name;
+    }
+
     @Nullable
     public synchronized T get()
     {

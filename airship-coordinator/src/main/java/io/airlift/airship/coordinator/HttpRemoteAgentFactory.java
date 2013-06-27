@@ -22,10 +22,12 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
     private final JsonCodec<AgentStatusRepresentation> agentStatusCodec;
     private final JsonCodec<SlotStatusRepresentation> slotStatusCodec;
     private final JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec;
+    private final HttpRemoteSlotJobFactory slotJobFactory;
 
     @Inject
     public HttpRemoteAgentFactory(NodeInfo nodeInfo,
             @Global AsyncHttpClient httpClient,
+            HttpRemoteSlotJobFactory slotJobFactory,
             JsonCodec<InstallationRepresentation> installationCodec,
             JsonCodec<SlotStatusRepresentation> slotStatusCodec,
             JsonCodec<AgentStatusRepresentation> agentStatusCodec,
@@ -33,6 +35,7 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
     {
         environment = nodeInfo.getEnvironment();
         this.httpClient = httpClient;
+        this.slotJobFactory = slotJobFactory;
         this.agentStatusCodec = agentStatusCodec;
         this.installationCodec = installationCodec;
         this.slotStatusCodec = slotStatusCodec;
@@ -52,6 +55,6 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
                 ImmutableList.<SlotStatus>of(),
                 ImmutableMap.<String, Integer>of());
 
-        return new HttpRemoteAgent(agentStatus, environment, httpClient, installationCodec, agentStatusCodec, slotStatusCodec, serviceDescriptorsCodec);
+        return new HttpRemoteAgent(agentStatus, environment, slotJobFactory, httpClient, installationCodec, agentStatusCodec, slotStatusCodec, serviceDescriptorsCodec);
     }
 }

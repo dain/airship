@@ -1,6 +1,7 @@
 package io.airlift.airship.agent.job;
 
 import io.airlift.airship.agent.Agent;
+import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobId;
 import io.airlift.airship.shared.job.SlotJobStatus;
@@ -26,9 +27,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Path("/v1/agent/job")
 public class AgentJobResource
 {
-    public static final String AIRSHIP_CURRENT_STATE = "X-Airship-Current-State";
-    public static final String AIRSHIP_MAX_WAIT = "X-Airship-Max-Wait";
-
     private final Agent agent;
 
     @Inject
@@ -45,15 +43,16 @@ public class AgentJobResource
     {
         checkNotNull(slotJob, "slotJob is null");
         SlotJobStatus slotJobStatus = agent.createJob(slotJob);
-        return Response.ok().entity(slotJobStatus).build();
+        Response response = Response.ok().entity(slotJobStatus).build();
+        return response;
     }
 
     @GET
     @Path("{slotJobId}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getJobInfo(@PathParam("slotJobId") SlotJobId slotJobId,
-            @HeaderParam(AIRSHIP_CURRENT_STATE) SlotJobState currentState,
-            @HeaderParam(AIRSHIP_MAX_WAIT) Duration maxWait)
+            @HeaderParam(AirshipHeaders.AIRSHIP_CURRENT_STATE) SlotJobState currentState,
+            @HeaderParam(AirshipHeaders.AIRSHIP_MAX_WAIT) Duration maxWait)
             throws InterruptedException
     {
         checkNotNull(slotJobId, "slotJobId is null");
@@ -72,7 +71,7 @@ public class AgentJobResource
     @Path("{slotJobId}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response cancelJob(@PathParam("slotJobId") SlotJobId slotJobId,
-            @HeaderParam(AIRSHIP_MAX_WAIT) Duration maxWait)
+            @HeaderParam(AirshipHeaders.AIRSHIP_MAX_WAIT) Duration maxWait)
             throws InterruptedException
     {
         checkNotNull(slotJobId, "slotJobId is null");

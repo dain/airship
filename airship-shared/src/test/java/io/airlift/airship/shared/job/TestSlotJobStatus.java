@@ -47,6 +47,7 @@ public class TestSlotJobStatus
                 null);
 
         SlotJobStatus expected = new SlotJobStatus(new SlotJobId("id"),
+                URI.create("internal://apple/v1/job/id"),
                 SlotJobState.DONE,
                 representation,
                 "progress",

@@ -5,16 +5,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
 import io.airlift.airship.shared.SlotStatusRepresentation;
 
+import java.net.URI;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class SlotJobStatus
 {
+    private final URI self;
+
     public static enum SlotJobState {
         PENDING(false),
         RUNNING(false),
         DONE(true),
+        CANCELED(true),
         FAILED(true);
 
         private final boolean done;
@@ -40,6 +44,7 @@ public class SlotJobStatus
     @JsonCreator
     public SlotJobStatus(
             @JsonProperty("slotJobId") SlotJobId slotJobId,
+            @JsonProperty("self") URI self,
             @JsonProperty("state") SlotJobState state,
             @JsonProperty("slotStatus") SlotStatusRepresentation slotStatus,
             @JsonProperty("progressDescription") String progressDescription,
@@ -47,6 +52,7 @@ public class SlotJobStatus
             @JsonProperty("tasks") List<TaskStatus> tasks)
     {
         this.slotJobId = checkNotNull(slotJobId, "id is null");
+        this.self = checkNotNull(self, "self is null");
         this.state = checkNotNull(state, "state is null");
         this.slotStatus = slotStatus;
         this.progressDescription = progressDescription;
@@ -58,6 +64,12 @@ public class SlotJobStatus
     public SlotJobId getSlotJobId()
     {
         return slotJobId;
+    }
+
+    @JsonProperty
+    public URI getSelf()
+    {
+        return self;
     }
 
     @JsonProperty
@@ -95,6 +107,7 @@ public class SlotJobStatus
     {
         return Objects.toStringHelper(this)
                 .add("slotJobId", slotJobId)
+                .add("self", self)
                 .add("state", state)
                 .add("statusDescription", progressDescription)
                 .add("progress", progressPercentage)

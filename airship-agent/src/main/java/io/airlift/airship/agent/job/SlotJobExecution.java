@@ -18,6 +18,7 @@ import io.airlift.airship.shared.job.TaskStatus;
 import io.airlift.airship.shared.job.TaskStatus.TaskState;
 import io.airlift.units.Duration;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -28,6 +29,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.transform;
+import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 
 public class SlotJobExecution
         implements Runnable
@@ -39,11 +41,13 @@ public class SlotJobExecution
     private final StateMachine<SlotJobState> state;
     private final Progress progress = new Progress();
     private final AtomicBoolean canceled = new AtomicBoolean();
+    private final URI self;
 
     public SlotJobExecution(Agent agent, SlotJobId slotJobId, UUID slotId, List<TaskExecution> tasks, Executor executor)
     {
         this.agent = checkNotNull(agent, "agent is null");
         this.slotJobId = checkNotNull(slotJobId, "jobId is null");
+        this.self = uriBuilderFrom(agent.getAgentStatus().getInternalUri()).replacePath("v1/agent/job").appendPath(slotJobId.toString()).build();
         this.slotId = new AtomicReference<>(slotId);
         this.tasks = checkNotNull(tasks, "tasks is null");
         this.state = new StateMachine<>("slotJob " + slotId, executor, SlotJobState.PENDING);
@@ -66,6 +70,7 @@ public class SlotJobExecution
             slotStatus = SlotStatusRepresentation.from(agent.getSlot(slotId.get()).status());
         }
         return new SlotJobStatus(slotJobId,
+                self,
                 state.get(),
                 slotStatus,
                 progress.getDescription(),

@@ -16,6 +16,7 @@ import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.discovery.client.ServiceDescriptor;
 import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
 import io.airlift.http.client.AsyncHttpClient;
@@ -25,11 +26,13 @@ import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 
 import javax.ws.rs.core.Response.Status;
+
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static io.airlift.airship.shared.AgentLifecycleState.OFFLINE;
 import static io.airlift.airship.shared.AgentLifecycleState.ONLINE;
@@ -50,6 +53,7 @@ public class HttpRemoteAgent implements RemoteAgent
     private final JsonCodec<AgentStatusRepresentation> agentStatusCodec;
     private final JsonCodec<SlotStatusRepresentation> slotStatusCodec;
     private final JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec;
+    private final HttpRemoteSlotJobFactory slotJobFactory;
 
     private AgentStatus agentStatus;
     private final String environment;
@@ -61,23 +65,21 @@ public class HttpRemoteAgent implements RemoteAgent
 
     public HttpRemoteAgent(AgentStatus agentStatus,
             String environment,
+            HttpRemoteSlotJobFactory slotJobFactory,
             AsyncHttpClient httpClient,
             JsonCodec<InstallationRepresentation> installationCodec,
             JsonCodec<AgentStatusRepresentation> agentStatusCodec,
             JsonCodec<SlotStatusRepresentation> slotStatusCodec,
             JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec)
     {
-        Preconditions.checkNotNull(agentStatus, "agentStatus is null");
-        Preconditions.checkNotNull(environment, "environment is null");
-        Preconditions.checkNotNull(httpClient, "httpClient is null");
-
-        this.agentStatus = agentStatus;
-        this.environment = environment;
-        this.httpClient = httpClient;
-        this.installationCodec = installationCodec;
-        this.agentStatusCodec = agentStatusCodec;
-        this.slotStatusCodec = slotStatusCodec;
-        this.serviceDescriptorsCodec = serviceDescriptorsCodec;
+        this.agentStatus = checkNotNull(agentStatus, "agentStatus is null");
+        this.environment = checkNotNull(environment, "environment is null");
+        this.slotJobFactory = checkNotNull(slotJobFactory, "slotJobFactory is null");
+        this.httpClient = checkNotNull(httpClient, "httpClient is null");
+        this.installationCodec = checkNotNull(installationCodec, "installationCodec is null");
+        this.agentStatusCodec = checkNotNull(agentStatusCodec, "agentStatusCodec is null");
+        this.slotStatusCodec = checkNotNull(slotStatusCodec, "slotStatusCodec is null");
+        this.serviceDescriptorsCodec = checkNotNull(serviceDescriptorsCodec, "serviceDescriptorsCodec is null");
     }
 
     @Override
@@ -105,12 +107,17 @@ public class HttpRemoteAgent implements RemoteAgent
         }));
     }
 
+    public HttpRemoteSlotJob createSlotJob(SlotJob slotJob)
+    {
+        return slotJobFactory.createHttpRemoteSlotJob(this.status().getInternalUri(), slotJob);
+    }
+
     @Override
     public void setServiceInventory(List<ServiceDescriptor> serviceInventory)
     {
         AgentStatus agentStatus = status();
         if (agentStatus.getState() == ONLINE) {
-            Preconditions.checkNotNull(serviceInventory, "serviceInventory is null");
+            checkNotNull(serviceInventory, "serviceInventory is null");
             final URI internalUri = agentStatus.getInternalUri();
             Request request = Request.Builder.preparePut()
                     .setUri(uriBuilderFrom(internalUri).replacePath("/v1/serviceInventory").build())
@@ -177,7 +184,7 @@ public class HttpRemoteAgent implements RemoteAgent
 
     public synchronized void setStatus(AgentStatus agentStatus)
     {
-        Preconditions.checkNotNull(agentStatus, "agentStatus is null");
+        checkNotNull(agentStatus, "agentStatus is null");
         this.agentStatus = agentStatus;
     }
 
@@ -189,7 +196,7 @@ public class HttpRemoteAgent implements RemoteAgent
     @Override
     public SlotStatus install(Installation installation)
     {
-        Preconditions.checkNotNull(installation, "installation is null");
+        checkNotNull(installation, "installation is null");
         AgentStatus agentStatus = status();
         URI internalUri = agentStatus.getInternalUri();
         Preconditions.checkState(internalUri != null, "agent is down");

@@ -28,6 +28,8 @@ import io.airlift.airship.coordinator.AgentProvisioningRepresentation;
 import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.CoordinatorMainModule;
 import io.airlift.airship.coordinator.CoordinatorProvisioningRepresentation;
+import io.airlift.airship.coordinator.HttpRemoteSlotJob;
+import io.airlift.airship.coordinator.HttpRemoteSlotJobFactory;
 import io.airlift.airship.coordinator.InMemoryStateManager;
 import io.airlift.airship.coordinator.Instance;
 import io.airlift.airship.coordinator.Provisioner;
@@ -43,21 +45,30 @@ import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.HttpUriBuilder;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.Repository;
+import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.SlotStatusRepresentation.SlotStatusRepresentationFactory;
 import io.airlift.airship.shared.UpgradeVersions;
+import io.airlift.airship.shared.job.InstallTask;
+import io.airlift.airship.shared.job.SlotJob;
+import io.airlift.airship.shared.job.SlotJobId;
+import io.airlift.airship.shared.job.SlotJobStatus;
+import io.airlift.airship.shared.job.SlotJobStatus.SlotJobState;
+import io.airlift.airship.shared.job.StartTask;
 import io.airlift.configuration.ConfigurationFactory;
 import io.airlift.configuration.ConfigurationModule;
 import io.airlift.event.client.EventModule;
-import io.airlift.http.client.ApacheHttpClient;
-import io.airlift.http.client.HttpClient;
+import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.http.client.Request;
+import io.airlift.http.client.netty.StandaloneNettyAsyncHttpClient;
 import io.airlift.http.server.testing.TestingHttpServer;
 import io.airlift.http.server.testing.TestingHttpServerModule;
 import io.airlift.jaxrs.JaxrsModule;
 import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonModule;
 import io.airlift.node.NodeModule;
+import io.airlift.units.Duration;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -68,6 +79,7 @@ import javax.ws.rs.core.Response.Status;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
@@ -79,6 +91,7 @@ import static io.airlift.airship.shared.FileUtils.createTempDir;
 import static io.airlift.airship.shared.FileUtils.deleteRecursively;
 import static io.airlift.airship.shared.FileUtils.newFile;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
+import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
@@ -96,7 +109,7 @@ import static org.testng.Assert.assertTrue;
 
 public class TestServerIntegration
 {
-    private HttpClient httpClient;
+    private AsyncHttpClient httpClient;
 
     private TestingHttpServer coordinatorServer;
     private Coordinator coordinator;
@@ -122,6 +135,7 @@ public class TestServerIntegration
 
     private String agentInstanceId;
     private SlotStatusRepresentationFactory slotStatusRepresentationFactory;
+    private HttpRemoteSlotJobFactory httpRemoteSlotJobFactory;
 
     @BeforeClass
     public void startServer()
@@ -182,7 +196,8 @@ public class TestServerIntegration
 
         coordinatorServer.start();
 
-        httpClient = new ApacheHttpClient();
+        httpClient = new StandaloneNettyAsyncHttpClient("test");
+        httpRemoteSlotJobFactory = new HttpRemoteSlotJobFactory(httpClient, jsonCodec(SlotJob.class), jsonCodec(SlotJobStatus.class));
     }
 
     @BeforeMethod
@@ -224,9 +239,13 @@ public class TestServerIntegration
         if (localBinaryRepoDir != null) {
             deleteRecursively(localBinaryRepoDir);
         }
+
+        if (httpClient != null) {
+            httpClient.close();
+        }
     }
 
-    private void initializeOneAgent()
+    private Agent initializeOneAgent()
             throws Exception
     {
         List<Instance> instances = provisioner.provisionAgents("agent:config:1", 1, "instance-type", null, null, null, null);
@@ -261,6 +280,7 @@ public class TestServerIntegration
         assertNotNull(coordinator.getAgent(agentServer.getInstanceId()).getExternalUri());
 
         slotStatusRepresentationFactory = new SlotStatusRepresentationFactory(ImmutableList.of(appleSlot1.status(), appleSlot2.status(), bananaSlot.status()), repository);
+        return agent;
     }
 
     @Test
@@ -636,6 +656,67 @@ public class TestServerIntegration
         List<SlotStatusRepresentation> expected = ImmutableList.of(
                 slotStatusRepresentationFactory.create(bananaSlot.status().changeInstanceId(agentInstanceId)));
         assertEqualsNoOrder(actual, expected);
+    }
+
+    @Test
+    public void testSlotInstallationAndStartJob()
+            throws Exception
+    {
+        Agent agent = initializeOneAgent();
+        coordinator.updateAllAgentsAndWait();
+
+        Installation foo = new Installation("apple",
+                APPLE_ASSIGNMENT,
+                repository.binaryToHttpUri(APPLE_ASSIGNMENT.getBinary()),
+                repository.configToHttpUri(APPLE_ASSIGNMENT.getConfig()),
+                ImmutableMap.of("test", 999));
+
+        SlotJob slotJob = new SlotJob(new SlotJobId("job"), null, ImmutableList.of(new InstallTask(foo), new StartTask()));
+        HttpRemoteSlotJob httpRemoteSlotJob = httpRemoteSlotJobFactory.createHttpRemoteSlotJob(agent.getAgentStatus().getInternalUri(), slotJob);
+        SlotJobStatus slotJobStatus = httpRemoteSlotJob.getJobStatus();
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+
+        // wait for job to start
+        if (slotJobStatus.getState() == SlotJobState.PENDING) {
+            httpRemoteSlotJob.waitForJobStateChange(SlotJobState.PENDING, new Duration(1, TimeUnit.MINUTES));
+            slotJobStatus = httpRemoteSlotJob.getJobStatus();
+        }
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+        Assert.assertNotEquals(slotJobStatus.getState(), SlotJobState.PENDING);
+
+        // wait for job to finish
+        if (slotJobStatus.getState() == SlotJobState.RUNNING) {
+            httpRemoteSlotJob.waitForJobStateChange(SlotJobState.RUNNING, new Duration(1, TimeUnit.MINUTES));
+            slotJobStatus = httpRemoteSlotJob.getJobStatus();
+        }
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+        Assert.assertNotEquals(slotJobStatus.getState(), SlotJobState.RUNNING);
+
+        // verify done
+        assertEquals(slotJobStatus.getState(), SlotJobState.DONE);
+        SlotStatusRepresentation slotStatus = slotJobStatus.getSlotStatus();
+        assertNotNull(slotStatus, "slotStatus is null");
+        assertEquals(slotStatus.getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
+        assertEquals(slotStatus.getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
+        try {
+            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString());
+        }
+        catch (Throwable t) {
+            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString(), "with update");
+            throw t;
+        }
+
+        Slot slot = agent.getSlot(slotStatus.getId());
+        assertNotNull(slot, "slot is null");
+        assertEquals(slot.getLastSlotStatus().getAssignment(), APPLE_INSTALLATION.getAssignment());
+        try {
+            assertEquals(slot.getLastSlotStatus().getState(), SlotLifecycleState.RUNNING);
+        }
+        catch (Throwable t) {
+            assertEquals(slot.updateStatus().getState(), SlotLifecycleState.RUNNING, "with update");
+            throw t;
+        }
+        assertEquals(slot.status().getResources().get("test"), (Object) 999);
     }
 
     private HttpUriBuilder coordinatorUriBuilder()
