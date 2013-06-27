@@ -21,7 +21,7 @@ import org.testng.annotations.Test;
 import java.net.URI;
 import java.util.concurrent.Executors;
 
-import static io.airlift.airship.agent.DeploymentSlot.createNewDeploymentSlot;
+import static io.airlift.airship.agent.Slot.createNewDeploymentSlot;
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
 import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
 import static io.airlift.airship.shared.AssignmentHelper.BANANA_ASSIGNMENT;

@@ -1,7 +1,7 @@
 package io.airlift.airship.agent.job;
 
-import io.airlift.airship.agent.Progress;
 import io.airlift.airship.agent.Slot;
+import io.airlift.airship.agent.Progress;
 import io.airlift.airship.shared.job.RestartTask;
 
 public class RestartTaskExecution

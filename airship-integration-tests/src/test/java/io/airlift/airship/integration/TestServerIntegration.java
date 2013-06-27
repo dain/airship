@@ -708,9 +708,9 @@ public class TestServerIntegration
 
         Slot slot = agent.getSlot(slotStatus.getId());
         assertNotNull(slot, "slot is null");
-        assertEquals(slot.getLastSlotStatus().getAssignment(), APPLE_INSTALLATION.getAssignment());
+        assertEquals(slot.status().getAssignment(), APPLE_INSTALLATION.getAssignment());
         try {
-            assertEquals(slot.getLastSlotStatus().getState(), SlotLifecycleState.RUNNING);
+            assertEquals(slot.status().getState(), SlotLifecycleState.RUNNING);
         }
         catch (Throwable t) {
             assertEquals(slot.updateStatus().getState(), SlotLifecycleState.RUNNING, "with update");

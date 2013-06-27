@@ -1,8 +1,8 @@
 package io.airlift.airship.agent.job;
 
 import com.google.common.base.Throwables;
-import io.airlift.airship.agent.Progress;
 import io.airlift.airship.agent.Slot;
+import io.airlift.airship.agent.Progress;
 import io.airlift.airship.shared.job.Task;
 import io.airlift.airship.shared.job.TaskStatus;
 import io.airlift.airship.shared.job.TaskStatus.TaskState;
