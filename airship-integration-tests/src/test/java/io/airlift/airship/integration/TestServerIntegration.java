@@ -14,6 +14,8 @@
 package io.airlift.airship.integration;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
@@ -28,6 +30,7 @@ import io.airlift.airship.coordinator.AgentProvisioningRepresentation;
 import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.CoordinatorMainModule;
 import io.airlift.airship.coordinator.CoordinatorProvisioningRepresentation;
+import io.airlift.airship.coordinator.HttpRemoteAgent;
 import io.airlift.airship.coordinator.HttpRemoteSlotJob;
 import io.airlift.airship.coordinator.HttpRemoteSlotJobFactory;
 import io.airlift.airship.coordinator.InMemoryStateManager;
@@ -39,6 +42,7 @@ import io.airlift.airship.coordinator.TestingMavenRepository;
 import io.airlift.airship.integration.MockLocalProvisioner.AgentServer;
 import io.airlift.airship.integration.MockLocalProvisioner.CoordinatorServer;
 import io.airlift.airship.shared.AgentLifecycleState;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
@@ -209,7 +213,7 @@ public class TestServerIntegration
         assertEquals(coordinator.getCoordinators().size(), 1);
 
         provisioner.clearAgents();
-        coordinator.updateAllAgentsAndWait();
+        coordinator.updateAllAgents();
         assertTrue(coordinator.getAgents().isEmpty());
 
         stateManager.clearAll();
@@ -272,7 +276,9 @@ public class TestServerIntegration
                 repository.configToHttpUri(BANANA_ASSIGNMENT.getConfig()),
                 ImmutableMap.of("memory", 512))).getId());
 
-        coordinator.updateAllAgentsAndWait();
+        coordinator.updateAllAgents();
+        waitForAgentToBeOnline(agentInstanceId);
+
         assertEquals(coordinator.getAgents().size(), 1);
         assertNotNull(coordinator.getAgent(agentServer.getInstanceId()));
         assertEquals(coordinator.getAgent(agentServer.getInstanceId()).getState(), AgentLifecycleState.ONLINE);
@@ -400,7 +406,8 @@ public class TestServerIntegration
         assertEquals(instances.size(), 1);
         AgentServer agentServer = provisioner.getAgent(instances.get(0).getInstanceId());
         agentServer.start();
-        coordinator.updateAllAgentsAndWait();
+        coordinator.updateAllAgents();
+        waitForAgentToBeOnline(instances.get(0).getInstanceId());
 
         // get list of all agents
         Request request = Request.Builder.prepareGet()
@@ -451,7 +458,8 @@ public class TestServerIntegration
         // start the agent and verify
         AgentServer agentServer = provisioner.getAgent(agents.get(0).getInstanceId());
         agentServer.start();
-        coordinator.updateAllAgentsAndWait();
+        coordinator.updateAllAgents();
+        waitForAgentToBeOnline(instanceId);
         assertEquals(coordinator.getAgents().size(), 1);
         assertEquals(coordinator.getAgent(instanceId).getInstanceId(), instanceId);
         assertEquals(coordinator.getAgent(instanceId).getInstanceType(), instanceType);
@@ -486,7 +494,8 @@ public class TestServerIntegration
     public void testStart()
             throws Exception
     {
-        initializeOneAgent();
+        Agent agent = initializeOneAgent();
+        waitForAgentStatusPropagation(agent);
 
         Request request = Request.Builder.preparePut()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").addParameter("binary", "*:apple:*").build())
@@ -508,7 +517,8 @@ public class TestServerIntegration
     public void testUpgrade()
             throws Exception
     {
-        initializeOneAgent();
+        Agent agent = initializeOneAgent();
+        waitForAgentStatusPropagation(agent);
 
         UpgradeVersions upgradeVersions = new UpgradeVersions("2.0", "@2.0");
         Request request = Request.Builder.preparePost()
@@ -536,7 +546,8 @@ public class TestServerIntegration
     public void testTerminate()
             throws Exception
     {
-        initializeOneAgent();
+        Agent agent = initializeOneAgent();
+        waitForAgentStatusPropagation(agent);
 
         Request request = Request.Builder.prepareDelete()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot").addParameter("binary", "*:apple:*").build())
@@ -557,10 +568,10 @@ public class TestServerIntegration
     public void testRestart()
             throws Exception
     {
-        initializeOneAgent();
+        Agent agent = initializeOneAgent();
 
         appleSlot1.start();
-        coordinator.updateAllAgentsAndWait();
+        waitForAgentStatusPropagation(agent);
         assertEquals(appleSlot1.status().getState(), RUNNING);
 
         File pidFile = newFile(appleSlot1.status().getInstallPath(), "..", "installation", "launcher.pid").getCanonicalFile();
@@ -589,12 +600,12 @@ public class TestServerIntegration
     public void testStop()
             throws Exception
     {
-        initializeOneAgent();
+        Agent agent = initializeOneAgent();
 
         appleSlot1.start();
         appleSlot2.start();
         bananaSlot.start();
-        coordinator.updateAllAgentsAndWait();
+        waitForAgentStatusPropagation(agent);
 
         Request request = Request.Builder.preparePut()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").addParameter("binary", "*:apple:*").build())
@@ -617,12 +628,12 @@ public class TestServerIntegration
     public void testKill()
             throws Exception
     {
-        initializeOneAgent();
+        Agent agent = initializeOneAgent();
 
         appleSlot1.start();
         appleSlot2.start();
         bananaSlot.start();
-        coordinator.updateAllAgentsAndWait();
+        waitForAgentStatusPropagation(agent);
 
         Request request = Request.Builder.preparePut()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").addParameter("binary", "*:apple:*").build())
@@ -645,8 +656,8 @@ public class TestServerIntegration
     public void testShow()
             throws Exception
     {
-        initializeOneAgent();
-        coordinator.updateAllAgentsAndWait();
+        Agent agent = initializeOneAgent();
+        waitForAgentStatusPropagation(agent);
 
         Request request = Request.Builder.prepareGet()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot").addParameter("!binary", "*:apple:*").build())
@@ -663,7 +674,7 @@ public class TestServerIntegration
             throws Exception
     {
         Agent agent = initializeOneAgent();
-        coordinator.updateAllAgentsAndWait();
+        waitForAgentStatusPropagation(agent);
 
         Installation foo = new Installation("apple",
                 APPLE_ASSIGNMENT,
@@ -717,6 +728,42 @@ public class TestServerIntegration
             throw t;
         }
         assertEquals(slot.status().getResources().get("test"), (Object) 999);
+    }
+
+    private void waitForAgentToBeOnline(String agentInstanceId)
+            throws InterruptedException
+    {
+        // wait for coordinator to mark the agent online
+        HttpRemoteAgent remoteAgent = (HttpRemoteAgent) coordinator.getRemoteAgentByInstanceId(agentInstanceId);
+        Preconditions.checkArgument(remoteAgent != null, "No such agent %s", agentInstanceId);
+        Duration maxWait = new Duration(1, TimeUnit.SECONDS);
+        while (maxWait.toMillis() > 1) {
+            AgentStatus agentStatus = remoteAgent.status();
+            if (Objects.equal(agentStatus.getState(), AgentLifecycleState.ONLINE)) {
+                break;
+            }
+
+            maxWait = remoteAgent.waitForStateChange(agentStatus, maxWait);
+        }
+    }
+
+    private void waitForAgentStatusPropagation(Agent agent)
+            throws InterruptedException
+    {
+        coordinator.updateAllAgents();
+        // Agent doesn't know it's instance-id so we need to lookup by agent id
+        // Be careful that someone called waitForAgentToBeOnline or you will not find the agent
+        HttpRemoteAgent remoteAgent = (HttpRemoteAgent) coordinator.getRemoteAgentByAgentId(agent.getAgentId());
+        Preconditions.checkArgument(remoteAgent != null, "No remote agent for %s", agent.getAgentId());
+        Duration maxWait = new Duration(1, TimeUnit.SECONDS);
+        while (maxWait.toMillis() > 1) {
+            AgentStatus agentStatus = remoteAgent.status();
+            if (Objects.equal(agentStatus.getAgentId(), agent.getAgentId())) {
+                break;
+            }
+
+            maxWait = remoteAgent.waitForStateChange(agentStatus, maxWait);
+        }
     }
 
     private HttpUriBuilder coordinatorUriBuilder()

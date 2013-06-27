@@ -1,6 +1,5 @@
 package io.airlift.airship.coordinator;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotStatus;
@@ -11,6 +10,10 @@ import java.util.List;
 
 public interface RemoteAgent
 {
+    void start();
+
+    void stop();
+
     AgentStatus status();
 
     void setInternalUri(URI uri);
@@ -18,8 +21,6 @@ public interface RemoteAgent
     SlotStatus install(Installation installation);
 
     List<? extends RemoteSlot> getSlots();
-
-    ListenableFuture<?> updateStatus();
 
     void setServiceInventory(List<ServiceDescriptor> serviceInventory);
 }

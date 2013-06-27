@@ -50,8 +50,8 @@ public class TestLifecycleResource
                 new HttpServerInfo(new HttpServerConfig(), new NodeInfo("test")),
                 new NodeInfo("test"),
                 new MockDeploymentManagerFactory(),
-                new MockLifecycleManager()
-        );
+                new MockLifecycleManager());
+        agent.start();
 
         SlotStatus slotStatus = agent.install(APPLE_INSTALLATION);
         slot = agent.getSlot(slotStatus.getId());

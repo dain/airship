@@ -37,21 +37,22 @@ public class TestAgentResource
                 new HttpServerInfo(new HttpServerConfig(), new NodeInfo("test")),
                 new NodeInfo("test"),
                 new MockDeploymentManagerFactory(),
-                new MockLifecycleManager()
-        );
+                new MockLifecycleManager());
+        agent.start();
         agentResource = new AgentResource(agent);
     }
 
     @Test
     public void testGetAllSlotsStatus()
+            throws InterruptedException
     {
-        Response response = agentResource.getAllSlotsStatus();
+        Response response = agentResource.getAgentStatus(null, null);
         AgentStatusRepresentation actual = (AgentStatusRepresentation) response.getEntity();
         assertEquals(actual.getAgentId(), agent.getAgentId());
         assertEquals(actual.getState(), ONLINE);
         assertEquals(actual.getInstanceType(), null);
         assertEquals(actual.getResources(), TEST_RESOURCES);
-        assertEquals(actual.getLocation(), agent.getLocation());
+        assertEquals(actual.getLocation(), agent.getAgentStatus().getLocation());
     }
 
 }

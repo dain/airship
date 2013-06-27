@@ -159,7 +159,7 @@ public class Coordinator
         timerService = Executors.newScheduledThreadPool(10, new ThreadFactoryBuilder().setNameFormat("coordinator-agent-monitor").setDaemon(true).build());
 
         updateAllCoordinatorsAndWait();
-        updateAllAgentsAndWait();
+        updateAllAgents();
     }
 
     @PostConstruct
@@ -303,6 +303,32 @@ public class Coordinator
     }
 
     @VisibleForTesting
+    public RemoteAgent getRemoteAgentByInstanceId(String instanceId)
+    {
+        checkNotNull(instanceId, "instanceId is null");
+        for (RemoteAgent remoteAgent : agents.values()) {
+            AgentStatus status = remoteAgent.status();
+            if (instanceId.equals(status.getInstanceId())) {
+                return remoteAgent;
+            }
+        }
+        return null;
+    }
+
+    @VisibleForTesting
+    public RemoteAgent getRemoteAgentByAgentId(String agentId)
+    {
+        checkNotNull(agentId, "agentId is null");
+        for (RemoteAgent remoteAgent : agents.values()) {
+            AgentStatus status = remoteAgent.status();
+            if (agentId.equals(status.getAgentId())) {
+                return remoteAgent;
+            }
+        }
+        return null;
+    }
+
+    @VisibleForTesting
     public void updateAllCoordinatorsAndWait()
     {
         waitForFutures(updateAllCoordinators());
@@ -344,20 +370,17 @@ public class Coordinator
     }
 
     @VisibleForTesting
-    public void updateAllAgentsAndWait()
-    {
-        waitForFutures(updateAllAgents());
-    }
-
-    private List<ListenableFuture<?>> updateAllAgents()
+    public void updateAllAgents()
     {
         Set<String> instanceIds = newHashSet();
         for (Instance instance : this.provisioner.listAgents()) {
             instanceIds.add(instance.getInstanceId());
-            RemoteAgent remoteAgent = remoteAgentFactory.createRemoteAgent(instance, instance.getInternalUri() != null ? AgentLifecycleState.ONLINE : AgentLifecycleState.OFFLINE);
+            RemoteAgent remoteAgent = remoteAgentFactory.createRemoteAgent(instance, AgentLifecycleState.OFFLINE);
             RemoteAgent existing = agents.putIfAbsent(instance.getInstanceId(), remoteAgent);
             if (existing != null) {
                 existing.setInternalUri(instance.getInternalUri());
+            } else {
+                remoteAgent.start();
             }
         }
 
@@ -366,19 +389,20 @@ public class Coordinator
             if (remoteAgent.status().getState() == AgentLifecycleState.PROVISIONING) {
                 instanceIds.add(remoteAgent.status().getAgentId());
             }
-
         }
 
         // remove any agents not in the provisioner list
-        agents.keySet().retainAll(instanceIds);
+        for (String instancesToRemove : Sets.difference(agents.keySet(), instanceIds)) {
+            RemoteAgent remoteAgent = agents.remove(instancesToRemove);
+            if (remoteAgent != null) {
+                remoteAgent.stop();
+            }
+        }
 
-        List<ListenableFuture<?>> futures = new ArrayList<>();
         List<ServiceDescriptor> serviceDescriptors = serviceInventory.getServiceInventory(transform(getAllSlots(), getSlotStatus()));
         for (RemoteAgent remoteAgent : agents.values()) {
-            futures.add(remoteAgent.updateStatus());
             remoteAgent.setServiceInventory(serviceDescriptors);
         }
-        return futures;
     }
 
     public List<AgentStatus> provisionAgents(String agentConfigSpec,
@@ -403,6 +427,7 @@ public class Coordinator
 
             RemoteAgent remoteAgent = remoteAgentFactory.createRemoteAgent(instance, AgentLifecycleState.PROVISIONING);
             this.agents.put(instanceId, remoteAgent);
+            remoteAgent.start();
 
             agents.add(remoteAgent.status());
         }
@@ -427,6 +452,7 @@ public class Coordinator
             agents.putIfAbsent(agent.status().getInstanceId(), agent);
             throw new IllegalStateException("Cannot terminate agent that has slots: " + agentId);
         }
+        agent.stop();
         provisioner.terminateAgents(ImmutableList.of(agentId));
         return agent.status().changeState(AgentLifecycleState.TERMINATED);
     }

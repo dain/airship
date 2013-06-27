@@ -62,8 +62,8 @@ public class TestSlotResource
                 httpServerInfo,
                 new NodeInfo("test"),
                 new MockDeploymentManagerFactory(),
-                new MockLifecycleManager()
-        );
+                new MockLifecycleManager());
+        agent.start();
         resource = new SlotResource(agent);
     }
 

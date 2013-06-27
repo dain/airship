@@ -14,6 +14,7 @@
 package io.airlift.airship.integration;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Binder;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -23,11 +24,11 @@ import com.google.inject.util.Modules;
 import io.airlift.airship.agent.Agent;
 import io.airlift.airship.agent.AgentMainModule;
 import io.airlift.airship.agent.DeploymentManagerFactory;
-import io.airlift.airship.agent.Slot;
 import io.airlift.airship.agent.LifecycleManager;
 import io.airlift.airship.agent.MockDeploymentManagerFactory;
 import io.airlift.airship.agent.MockLifecycleManager;
 import io.airlift.airship.agent.Progress;
+import io.airlift.airship.agent.Slot;
 import io.airlift.airship.coordinator.HttpRemoteAgent;
 import io.airlift.airship.coordinator.HttpRemoteSlot;
 import io.airlift.airship.coordinator.HttpRemoteSlotJobFactory;
@@ -61,6 +62,8 @@ import java.io.File;
 import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
 import static io.airlift.airship.shared.AssignmentHelper.BANANA_ASSIGNMENT;
@@ -97,6 +100,7 @@ public class TestRemoteSlot
     private Slot slot;
     private HttpRemoteAgent remoteAgent;
     private NettyIoPool nettyIoPool;
+    private ExecutorService executor;
 
     @BeforeClass
     public void startServer()
@@ -131,11 +135,13 @@ public class TestRemoteSlot
         server.start();
         nettyIoPool = new NettyIoPool("test");
         client = new NettyAsyncHttpClient("test", new HttpClientConfig(), nettyIoPool);
-        remoteAgent = new HttpRemoteAgent(
+        executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("agent-%d").build());
+        remoteAgent = HttpRemoteAgent.createHttpRemoteAgent(
                 agent.getAgentStatus(),
                 "test",
                 new HttpRemoteSlotJobFactory(client, jsonCodec(SlotJob.class), jsonCodec(SlotJobStatus.class)),
                 client,
+                executor,
                 jsonCodec(InstallationRepresentation.class),
                 jsonCodec(AgentStatusRepresentation.class),
                 jsonCodec(SlotStatusRepresentation.class),
@@ -171,6 +177,8 @@ public class TestRemoteSlot
         if (nettyIoPool != null) {
             nettyIoPool.close();
         }
+
+        executor.shutdownNow();
     }
 
     @Test

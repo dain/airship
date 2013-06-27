@@ -7,6 +7,7 @@ import com.google.common.net.MediaType;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.airship.coordinator.SimpleHttpResponseHandler.SimpleHttpResponseCallback;
 import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.airship.shared.SetThreadName;
 import io.airlift.airship.shared.StateMachine;
@@ -18,7 +19,6 @@ import io.airlift.airship.shared.job.SlotJobStatus.SlotJobState;
 import io.airlift.airship.shared.job.TaskStatus;
 import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.http.client.FullJsonResponseHandler.JsonResponse;
-import io.airlift.http.client.HttpStatus;
 import io.airlift.http.client.JsonBodyGenerator;
 import io.airlift.http.client.Request;
 import io.airlift.http.client.StatusResponseHandler.StatusResponse;
@@ -253,7 +253,7 @@ public class HttpRemoteSlotJob
 
         private synchronized void scheduleNextRequest()
         {
-            try (SetThreadName setThreadName = new SetThreadName(slotJobStatus.getName())) {
+            try (SetThreadName setThreadName = new SetThreadName("ContinuousSlotJobUpdater-%s", slotJobId)) {
                 // stopped or done?
                 SlotJobStatus slotJobStatus = HttpRemoteSlotJob.this.slotJobStatus.get();
                 if (!running || slotJobStatus.getState().isDone()) {
@@ -299,9 +299,7 @@ public class HttpRemoteSlotJob
                 }
 
                 try {
-                    synchronized (HttpRemoteSlotJob.this) {
-                        updateSlotJobStatus(value);
-                    }
+                    updateSlotJobStatus(value);
                 }
                 finally {
                     scheduleNextRequest();
@@ -320,58 +318,5 @@ public class HttpRemoteSlotJob
                 failTask(cause);
             }
         }
-    }
-
-    public static class SimpleHttpResponseHandler<T>
-            implements FutureCallback<JsonResponse<T>>
-    {
-        private final SimpleHttpResponseCallback<T> callback;
-
-        private final URI uri;
-
-        public SimpleHttpResponseHandler(SimpleHttpResponseCallback<T> callback, URI uri)
-        {
-            this.callback = callback;
-            this.uri = uri;
-        }
-
-        @Override
-        public void onSuccess(JsonResponse<T> response)
-        {
-            try {
-                if (response.getStatusCode() == HttpStatus.OK.code() && response.hasValue()) {
-                    callback.success(response.getValue());
-                }
-                else {
-                    // Something is broken in the server or the client, so fail the task immediately (includes 500 errors)
-                    Exception cause = response.getException();
-                    if (cause == null) {
-                        cause = new RuntimeException(String.format("Expected response code from %s to be %s, but was %s: %s",
-                                uri,
-                                HttpStatus.OK.code(),
-                                response.getStatusCode(),
-                                response.getStatusMessage()));
-                    }
-                    callback.fatal(cause);
-                }
-            }
-            catch (Throwable t) {
-                // this should never happen
-                callback.fatal(t);
-            }
-        }
-
-        @Override
-        public void onFailure(Throwable t)
-        {
-            callback.fatal(t);
-        }
-    }
-
-    public interface SimpleHttpResponseCallback<T>
-    {
-        void success(T value);
-
-        void fatal(Throwable cause);
     }
 }

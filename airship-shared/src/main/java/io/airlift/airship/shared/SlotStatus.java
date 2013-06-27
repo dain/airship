@@ -14,10 +14,12 @@
 package io.airlift.airship.shared;
 
 import com.google.common.base.Function;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 import javax.annotation.concurrent.Immutable;
+
 import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
@@ -258,95 +260,66 @@ public class SlotStatus
     }
 
     @Override
-    public boolean equals(Object o)
+    public int hashCode()
     {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
-        SlotStatus that = (SlotStatus) o;
-
-        if (assignment != null ? !assignment.equals(that.assignment) : that.assignment != null) {
-            return false;
-        }
-        if (!id.equals(that.id)) {
-            return false;
-        }
-        if (installPath != null ? !installPath.equals(that.installPath) : that.installPath != null) {
-            return false;
-        }
-        if (instanceId != null ? !instanceId.equals(that.instanceId) : that.instanceId != null) {
-            return false;
-        }
-        if (!location.equals(that.location)) {
-            return false;
-        }
-        if (self != null ? !self.equals(that.self) : that.self != null) {
-            return false;
-        }
-        if (externalUri != null ? !externalUri.equals(that.externalUri) : that.externalUri != null) {
-            return false;
-        }
-        if (state != that.state) {
-            return false;
-        }
-        if (!version.equals(that.version)) {
-            return false;
-        }
-        if (!resources.equals(that.resources)) {
-            return false;
-        }
-        if (expectedState != that.expectedState) {
-            return false;
-        }
-        if (expectedAssignment != null ? !expectedAssignment.equals(that.expectedAssignment) : that.expectedAssignment != null) {
-            return false;
-        }
-
-        return true;
+        return Objects.hashCode(id,
+                self,
+                externalUri,
+                instanceId,
+                location,
+                assignment,
+                state,
+                version,
+                expectedState,
+                expectedAssignment,
+                statusMessage,
+                installPath,
+                resources);
     }
 
     @Override
-    public int hashCode()
+    public boolean equals(Object obj)
     {
-        int result = id.hashCode();
-        result = 31 * result + self.hashCode();
-        result = 31 * result + externalUri.hashCode();
-        result = 31 * result + instanceId.hashCode();
-        result = 31 * result + location.hashCode();
-        result = 31 * result + (assignment != null ? assignment.hashCode() : 0);
-        result = 31 * result + state.hashCode();
-        result = 31 * result + version.hashCode();
-        result = 31 * result + (installPath != null ? installPath.hashCode() : 0);
-        result = 31 * result + resources.hashCode();
-        result = 31 * result + (expectedState != null ? expectedState.hashCode() : 0);
-        result = 31 * result + (expectedAssignment != null ? expectedAssignment.hashCode() : 0);
-        return result;
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        final SlotStatus other = (SlotStatus) obj;
+        return Objects.equal(this.id, other.id) &&
+                Objects.equal(this.self, other.self) &&
+                Objects.equal(this.externalUri, other.externalUri) &&
+                Objects.equal(this.instanceId, other.instanceId) &&
+                Objects.equal(this.location, other.location) &&
+                Objects.equal(this.assignment, other.assignment) &&
+                Objects.equal(this.state, other.state) &&
+                Objects.equal(this.version, other.version) &&
+                Objects.equal(this.expectedState, other.expectedState) &&
+                Objects.equal(this.expectedAssignment, other.expectedAssignment) &&
+                Objects.equal(this.statusMessage, other.statusMessage) &&
+                Objects.equal(this.installPath, other.installPath) &&
+                Objects.equal(this.resources, other.resources);
     }
 
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("SlotStatus");
-        sb.append("{id=").append(id);
-        sb.append(", self=").append(self);
-        sb.append(", externalUri=").append(externalUri);
-        sb.append(", instanceId='").append(instanceId).append('\'');
-        sb.append(", location='").append(location).append('\'');
-        sb.append(", assignment=").append(assignment);
-        sb.append(", state=").append(state);
-        sb.append(", version='").append(version).append('\'');
-        sb.append(", expectedState=").append(expectedState);
-        sb.append(", expectedAssignment=").append(expectedAssignment);
-        sb.append(", statusMessage='").append(statusMessage).append('\'');
-        sb.append(", installPath='").append(installPath).append('\'');
-        sb.append(", resources=").append(resources);
-        sb.append('}');
-        return sb.toString();
+        return Objects.toStringHelper(this)
+                .add("id", id)
+                .add("self", self)
+                .add("externalUri", externalUri)
+                .add("instanceId", instanceId)
+                .add("location", location)
+                .add("assignment", assignment)
+                .add("state", state)
+                .add("version", version)
+                .add("expectedState", expectedState)
+                .add("expectedAssignment", expectedAssignment)
+                .add("statusMessage", statusMessage)
+                .add("installPath", installPath)
+                .add("resources", resources)
+                .toString();
     }
 
     public static Function<SlotStatus, String> idGetter()

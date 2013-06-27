@@ -5,8 +5,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
@@ -36,6 +34,16 @@ public class MockRemoteAgent implements RemoteAgent
     }
 
     @Override
+    public void start()
+    {
+    }
+
+    @Override
+    public void stop()
+    {
+    }
+
+    @Override
     public synchronized AgentStatus status()
     {
         return getAgentStatus();
@@ -58,12 +66,6 @@ public class MockRemoteAgent implements RemoteAgent
                 return new MockRemoteSlot(slotStatus, MockRemoteAgent.this);
             }
         }));
-    }
-
-    @Override
-    public synchronized ListenableFuture<?> updateStatus()
-    {
-        return Futures.immediateFuture(null);
     }
 
     synchronized void setSlotStatus(SlotStatus slotStatus)

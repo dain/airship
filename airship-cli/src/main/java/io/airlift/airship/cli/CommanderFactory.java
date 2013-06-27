@@ -6,8 +6,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.airship.agent.Agent;
 import io.airlift.airship.agent.DeploymentManagerFactory;
@@ -332,6 +330,16 @@ public class CommanderFactory
         }
 
         @Override
+        public void start()
+        {
+        }
+
+        @Override
+        public void stop()
+        {
+        }
+
+        @Override
         public void setInternalUri(URI uri)
         {
             Preconditions.checkArgument(FAKE_LOCAL_URI.equals(uri), "uri is not '" + FAKE_LOCAL_URI + "'");
@@ -366,12 +374,6 @@ public class CommanderFactory
                 builder.add(new LocalRemoteSlot(slot, agentId));
             }
             return builder.build();
-        }
-
-        @Override
-        public ListenableFuture<?> updateStatus()
-        {
-            return Futures.immediateFuture(null);
         }
 
         @Override

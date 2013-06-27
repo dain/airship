@@ -13,6 +13,7 @@
  */
 package io.airlift.airship.agent;
 
+import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMap;
@@ -26,6 +27,7 @@ import io.airlift.airship.agent.job.TaskExecution;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.shared.StateMachine;
 import io.airlift.airship.shared.StateMachine.StateChangeListener;
 import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.SlotJob;
@@ -37,6 +39,8 @@ import io.airlift.airship.shared.job.Task;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.Duration;
+
+import javax.annotation.PostConstruct;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -52,6 +56,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -75,6 +80,8 @@ public class Agent
     private final Duration maxLockWait;
     private final URI internalUri;
     private final URI externalUri;
+    private final StateMachine<AgentStatus> agentStatus;
+    private final AtomicBoolean started = new AtomicBoolean();
 
     private final ConcurrentMap<SlotJobId, SlotJobExecution> jobs = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, SlotJobId> lockedSlots = new ConcurrentHashMap<>();
@@ -151,6 +158,7 @@ public class Agent
             URI slotInternalUri = uriBuilderFrom(internalUri).appendPath("/v1/agent/slot/").appendPath(slotId.toString()).build();
             URI slotExternalUri = uriBuilderFrom(externalUri).appendPath("/v1/agent/slot/").appendPath(slotId.toString()).build();
             Slot slot = loadDeploymentSlot(slotInternalUri, slotExternalUri, deploymentManager, lifecycleManager, this.updateInterval, maxLockWait, this.executor);
+            // we add the state change listener in the start method to avoid memory visibility issues
             slots.put(slotId, slot);
         }
 
@@ -180,11 +188,28 @@ public class Agent
             }
         }
         this.resources = resources;
+
+        agentStatus = new StateMachine<>("agent " + agentId, executor, null);
+        updateAgentStatus();
     }
 
-    public Map<String, Integer> getResources()
+    @PostConstruct
+    public void start()
     {
-        return resources;
+        if (started.compareAndSet(false, true)) {
+            for (Slot slot : slots.values()) {
+                // when slot status change, update the agent status
+                slot.addStateChangeListener(new StateChangeListener<SlotStatus>()
+                {
+                    @Override
+                    public void stateChanged(SlotStatus newValue)
+                    {
+                        // we could be more efficient here, but let's just be safe
+                        updateAgentStatus();
+                    }
+                });
+            }
+        }
     }
 
     public String getAgentId()
@@ -192,12 +217,12 @@ public class Agent
         return agentId;
     }
 
-    public String getLocation()
+    public AgentStatus getAgentStatus()
     {
-        return location;
+        return agentStatus.get();
     }
 
-    public AgentStatus getAgentStatus()
+    public synchronized void updateAgentStatus()
     {
         Builder<SlotStatus> builder = ImmutableList.builder();
         for (Slot slot : slots.values()) {
@@ -205,7 +230,32 @@ public class Agent
             builder.add(slotStatus);
         }
         AgentStatus agentStatus = new AgentStatus(agentId, ONLINE, null, internalUri, externalUri, location, null, builder.build(), resources);
-        return agentStatus;
+        this.agentStatus.set(agentStatus);
+    }
+
+    public void addStateChangeListener(StateChangeListener<AgentStatus> stateChangeListener)
+    {
+        agentStatus.addStateChangeListener(stateChangeListener);
+    }
+
+    public Duration waitForStateChange(AgentStatus currentState, Duration maxWait)
+            throws InterruptedException
+    {
+        return agentStatus.waitForStateChange(currentState, maxWait);
+    }
+
+    public Duration waitForVersionChange(String version, Duration maxWait)
+            throws InterruptedException
+    {
+        while (maxWait.toMillis() > 1) {
+            AgentStatus agentStatus = getAgentStatus();
+            if (Objects.equal(agentStatus.getVersion(), version)) {
+                break;
+            }
+
+            maxWait = waitForStateChange(agentStatus, maxWait);
+        }
+        return maxWait;
     }
 
     public Slot getSlot(UUID slotId)
@@ -236,7 +286,19 @@ public class Agent
         if (slotJobId != null) {
             lockedSlots.put(slotId, slotJobId);
         }
+
+        // when slot status change, update the agent status
+        slot.addStateChangeListener(new StateChangeListener<SlotStatus>()
+        {
+            @Override
+            public void stateChanged(SlotStatus newValue)
+            {
+                updateAgentStatus();
+            }
+        });
         slots.put(slotId, slot);
+
+        updateAgentStatus();
 
         // return last slot status
         return slot.status();
@@ -288,7 +350,8 @@ public class Agent
         final SlotJobExecution slotJobExecution = new SlotJobExecution(this, slotJob.getSlotJobId(), slotJob.getSlotId(), taskExecutions, executor);
 
         // unlock the slot when the job completes
-        slotJobExecution.addStateChangeListener(new StateChangeListener<SlotJobState>() {
+        slotJobExecution.addStateChangeListener(new StateChangeListener<SlotJobState>()
+        {
             @Override
             public void stateChanged(SlotJobState newValue)
             {
@@ -307,7 +370,8 @@ public class Agent
         // job is already registered
         if (existingJob != null) {
             return existingJob.getStatus();
-        } else {
+        }
+        else {
             // job is new, start it
             executor.execute(slotJobExecution);
             return slotJobExecution.getStatus();

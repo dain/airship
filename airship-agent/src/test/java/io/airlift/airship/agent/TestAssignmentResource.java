@@ -57,8 +57,8 @@ public class TestAssignmentResource
                 new HttpServerInfo(new HttpServerConfig(), new NodeInfo("test")),
                 new NodeInfo("test"),
                 new MockDeploymentManagerFactory(),
-                new MockLifecycleManager()
-        );
+                new MockLifecycleManager());
+        agent.start();
         resource = new AssignmentResource(agent);
     }
 

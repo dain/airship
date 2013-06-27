@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 import javax.annotation.concurrent.Immutable;
+
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -92,10 +93,11 @@ public class AgentStatus
 
     public AgentStatus changeSlotStatus(SlotStatus slotStatus)
     {
-        Map<UUID,SlotStatus> slots = newHashMap(this.slots);
+        Map<UUID, SlotStatus> slots = newHashMap(this.slots);
         if (slotStatus.getState() != TERMINATED) {
             slots.put(slotStatus.getId(), slotStatus);
-        } else {
+        }
+        else {
             slots.remove(slotStatus.getId());
         }
         return new AgentStatus(agentId, state, instanceId, internalUri, externalUri, location, instanceType, slots.values(), resources);
@@ -103,7 +105,7 @@ public class AgentStatus
 
     public AgentStatus changeAllSlotsState(SlotLifecycleState slotState)
     {
-        Map<UUID,SlotStatus> slots = newHashMap(this.slots);
+        Map<UUID, SlotStatus> slots = newHashMap(this.slots);
         for (SlotStatus slotStatus : slots.values()) {
             // set all slots to unknown state
             slots.put(slotStatus.getId(), slotStatus.changeState(slotState));
@@ -157,45 +159,58 @@ public class AgentStatus
     }
 
     @Override
-    public boolean equals(Object o)
+    public int hashCode()
     {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
-        AgentStatus that = (AgentStatus) o;
-
-        if (!agentId.equals(that.agentId)) {
-            return false;
-        }
-
-        return true;
+        return Objects.hashCode(
+                agentId,
+                state,
+                instanceId,
+                internalUri,
+                externalUri,
+                slots,
+                location,
+                instanceType,
+                resources,
+                version);
     }
 
     @Override
-    public int hashCode()
+    public boolean equals(Object obj)
     {
-        return agentId.hashCode();
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        final AgentStatus other = (AgentStatus) obj;
+        return Objects.equal(this.agentId, other.agentId) &&
+                Objects.equal(this.state, other.state) &&
+                Objects.equal(this.instanceId, other.instanceId) &&
+                Objects.equal(this.internalUri, other.internalUri) &&
+                Objects.equal(this.externalUri, other.externalUri) &&
+                Objects.equal(this.slots, other.slots) &&
+                Objects.equal(this.location, other.location) &&
+                Objects.equal(this.instanceType, other.instanceType) &&
+                Objects.equal(this.resources, other.resources) &&
+                Objects.equal(this.version, other.version);
     }
 
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("AgentStatus");
-        sb.append("{agentId=").append(agentId);
-        sb.append(", state=").append(state);
-        sb.append(", instanceId=").append(instanceId);
-        sb.append(", internalUri=").append(internalUri);
-        sb.append(", externalUri=").append(externalUri);
-        sb.append(", slots=").append(slots.values());
-        sb.append(", resources=").append(resources);
-        sb.append(", version=").append(version);
-        sb.append('}');
-        return sb.toString();
+        return Objects.toStringHelper(this)
+                .add("agentId", agentId)
+                .add("state", state)
+                .add("instanceId", instanceId)
+                .add("internalUri", internalUri)
+                .add("externalUri", externalUri)
+                .add("slots", slots)
+                .add("location", location)
+                .add("instanceType", instanceType)
+                .add("resources", resources)
+                .add("version", version)
+                .toString();
     }
 
     public static Function<AgentStatus, String> idGetter()

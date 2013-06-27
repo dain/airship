@@ -2,6 +2,7 @@ package io.airlift.airship.coordinator;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
@@ -14,6 +15,9 @@ import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.json.JsonCodec;
 import io.airlift.node.NodeInfo;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
 public class HttpRemoteAgentFactory implements RemoteAgentFactory
 {
     private final String environment;
@@ -23,6 +27,7 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
     private final JsonCodec<SlotStatusRepresentation> slotStatusCodec;
     private final JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec;
     private final HttpRemoteSlotJobFactory slotJobFactory;
+    private final Executor executor;
 
     @Inject
     public HttpRemoteAgentFactory(NodeInfo nodeInfo,
@@ -40,6 +45,7 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
         this.installationCodec = installationCodec;
         this.slotStatusCodec = slotStatusCodec;
         this.serviceDescriptorsCodec = serviceDescriptorsCodec;
+        this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("agent-%d").build());
     }
 
     @Override
@@ -55,6 +61,14 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
                 ImmutableList.<SlotStatus>of(),
                 ImmutableMap.<String, Integer>of());
 
-        return new HttpRemoteAgent(agentStatus, environment, slotJobFactory, httpClient, installationCodec, agentStatusCodec, slotStatusCodec, serviceDescriptorsCodec);
+        return HttpRemoteAgent.createHttpRemoteAgent(agentStatus,
+                environment,
+                slotJobFactory,
+                httpClient,
+                executor,
+                installationCodec,
+                agentStatusCodec,
+                slotStatusCodec,
+                serviceDescriptorsCodec);
     }
 }

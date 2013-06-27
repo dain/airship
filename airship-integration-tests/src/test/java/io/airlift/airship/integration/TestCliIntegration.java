@@ -142,7 +142,7 @@ public class TestCliIntegration
         assertEquals(coordinator.getCoordinators().size(), 1);
 
         provisioner.clearAgents();
-        coordinator.updateAllAgentsAndWait();
+        coordinator.updateAllAgents();
         assertTrue(coordinator.getAgents().isEmpty());
 
         stateManager.clearAll();

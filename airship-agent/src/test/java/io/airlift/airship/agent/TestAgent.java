@@ -52,16 +52,16 @@ public class TestAgent
                 new HttpServerInfo(new HttpServerConfig(), nodeInfo),
                 nodeInfo,
                 new MockDeploymentManagerFactory(),
-                new MockLifecycleManager()
-        );
+                new MockLifecycleManager());
+        agent.start();
     }
 
     @Test
     public void test()
     {
         assertEquals(agent.getAgentId(), nodeInfo.getNodeId());
-        assertEquals(agent.getLocation(), agent.getLocation());
-        assertEquals(agent.getResources(), TEST_RESOURCES);
+        assertEquals(agent.getAgentStatus().getLocation(), "location");
+        assertEquals(agent.getAgentStatus().getResources(), TEST_RESOURCES);
     }
 
     @Test

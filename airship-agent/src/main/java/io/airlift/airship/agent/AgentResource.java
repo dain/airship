@@ -17,8 +17,11 @@ import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AirshipHeaders;
+import io.airlift.units.Duration;
 
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
@@ -39,8 +42,18 @@ public class AgentResource
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllSlotsStatus()
+    public Response getAgentStatus(@HeaderParam(AirshipHeaders.AIRSHIP_CURRENT_STATE) String currentVersion, @HeaderParam(AirshipHeaders.AIRSHIP_MAX_WAIT) Duration maxWait)
+            throws InterruptedException
     {
+        if (maxWait != null) {
+            try {
+                agent.waitForVersionChange(currentVersion, maxWait);
+            }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
         AgentStatus agentStatus = agent.getAgentStatus();
         AgentStatusRepresentation agentStatusRepresentation = AgentStatusRepresentation.from(agentStatus);
         return Response.ok(agentStatusRepresentation).build();

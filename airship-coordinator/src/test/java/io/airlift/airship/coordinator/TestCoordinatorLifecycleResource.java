@@ -129,7 +129,7 @@ public class TestCoordinatorLifecycleResource
                 MIN_PREFIX_SIZE);
 
         provisioner.addAgents(agentStatus);
-        coordinator.updateAllAgentsAndWait();
+        coordinator.updateAllAgents();
     }
 
     @Test
