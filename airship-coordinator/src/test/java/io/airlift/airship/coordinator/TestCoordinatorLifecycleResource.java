@@ -16,6 +16,11 @@ package io.airlift.airship.coordinator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.LifecycleRequest;
+import io.airlift.airship.shared.IdAndVersion;
+import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotLifecycleState;
@@ -46,9 +51,11 @@ import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
 import static io.airlift.airship.shared.Strings.shortestUniquePrefix;
+import static io.airlift.airship.shared.job.SlotJobStatus.slotStatusGetter;
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 public class TestCoordinatorLifecycleResource
 {
@@ -78,7 +85,7 @@ public class TestCoordinatorLifecycleResource
                 provisioner,
                 new InMemoryStateManager(),
                 new MockServiceInventory());
-        resource = new CoordinatorLifecycleResource(coordinator, MOCK_REPO);
+        resource = new CoordinatorLifecycleResource(coordinator);
 
         apple1SlotId = UUID.randomUUID();
         SlotStatus appleSlotStatus1 = createSlotStatus(apple1SlotId,
@@ -92,8 +99,8 @@ public class TestCoordinatorLifecycleResource
                 ImmutableMap.<String, Integer>of());
         apple2SlotId = UUID.randomUUID();
         SlotStatus appleSlotStatus2 = createSlotStatus(apple2SlotId,
-                URI.create("fake://foo/v1/agent/slot/apple1"),
-                URI.create("fake://foo/v1/agent/slot/apple1"),
+                URI.create("fake://foo/v1/agent/slot/apple2"),
+                URI.create("fake://foo/v1/agent/slot/apple2"),
                 "instance",
                 "/location",
                 STOPPED,
@@ -135,7 +142,7 @@ public class TestCoordinatorLifecycleResource
     @Test
     public void testMultipleStateMachineWithFilter()
     {
-        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/lifecycle?binary=*:apple:*");
+        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/lifecycle");
 
         // default state is stopped
         assertSlotState(apple1SlotId, STOPPED);
@@ -143,108 +150,91 @@ public class TestCoordinatorLifecycleResource
         assertSlotState(bananaSlotId, STOPPED);
 
         // stopped.start => running
-        assertOkResponse(resource.setState("running", uriInfo), RUNNING, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.START, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), RUNNING, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, RUNNING);
         assertSlotState(apple2SlotId, RUNNING);
         assertSlotState(bananaSlotId, STOPPED);
 
         // running.start => running
-        assertOkResponse(resource.setState("running", uriInfo), RUNNING, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.START, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), RUNNING, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, RUNNING);
         assertSlotState(apple2SlotId, RUNNING);
         assertSlotState(bananaSlotId, STOPPED);
 
         // running.stop => stopped
-        assertOkResponse(resource.setState("stopped", uriInfo), STOPPED, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.STOP, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), STOPPED, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, STOPPED);
         assertSlotState(apple2SlotId, STOPPED);
         assertSlotState(bananaSlotId, STOPPED);
 
         // stopped.stop => stopped
-        assertOkResponse(resource.setState("stopped", uriInfo), STOPPED, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.STOP, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), STOPPED, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, STOPPED);
         assertSlotState(apple2SlotId, STOPPED);
         assertSlotState(bananaSlotId, STOPPED);
 
         // stopped.restart => running
-        assertOkResponse(resource.setState("restarting", uriInfo), RUNNING, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.RESTART, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), RUNNING, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, RUNNING);
         assertSlotState(apple2SlotId, RUNNING);
         assertSlotState(bananaSlotId, STOPPED);
 
         // running.restart => running
-        assertOkResponse(resource.setState("restarting", uriInfo), RUNNING, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.RESTART, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), RUNNING, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, RUNNING);
         assertSlotState(apple2SlotId, RUNNING);
         assertSlotState(bananaSlotId, STOPPED);
 
         // running.kill => stopped
-        assertOkResponse(resource.setState("killing", uriInfo), STOPPED, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.KILL, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), STOPPED, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, STOPPED);
         assertSlotState(apple2SlotId, STOPPED);
         assertSlotState(bananaSlotId, STOPPED);
 
         // stopped.kill => stopped
-        assertOkResponse(resource.setState("killing", uriInfo), STOPPED, apple1SlotId, apple2SlotId);
+        assertOkResponse(resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.KILL, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo), STOPPED, apple1SlotId, apple2SlotId);
         assertSlotState(apple1SlotId, STOPPED);
         assertSlotState(apple2SlotId, STOPPED);
         assertSlotState(bananaSlotId, STOPPED);
     }
 
-    @Test
-    public void testSetStateUnknownState()
-    {
-        Response response = resource.setState("unknown", uriInfo);
-        assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
-        assertNull(response.getEntity());
-    }
-
     @Test(expectedExceptions = NullPointerException.class)
     public void testSetStateNullState()
     {
-        resource.setState(null, uriInfo);
+        resource.doLifecycle(null, uriInfo);
     }
 
-    @Test(expectedExceptions = InvalidSlotFilterException.class)
+    @Test
     public void testSetStateNoFilter()
     {
-        resource.setState("running", MockUriInfo.from("http://localhost/v1/slot/lifecycle"));
+        Response response = resource.doLifecycle(new LifecycleRequest(SlotLifecycleAction.START, ImmutableList.<IdAndVersion>of()), MockUriInfo.from("http://localhost/v1/slot/lifecycle"));
+        assertEquals(response.getStatus(), Response.Status.BAD_REQUEST.getStatusCode());
     }
 
-//    @Test
-//    public void testInvalidVersion()
-//    {
-//        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/lifecycle?binary=*:apple:*");
-//        try {
-//            resource.setState("running", uriInfo);
-//            fail("Expected VersionConflictException");
-//        }
-//        catch (VersionConflictException e) {
-//            assertEquals(e.getName(), AIRSHIP_SLOTS_VERSION_HEADER);
-//            assertEquals(e.getVersion(), VersionsUtil.createSlotsVersion(coordinator.getAllSlotsStatus(SlotFilterBuilder.build(uriInfo, false, ImmutableList.<UUID>of()))));
-//        }
-//    }
-//
-//    @Test
-//    public void testValidVersion()
-//    {
+    @Test
+    public void testValidVersion()
+    {
 //        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/lifecycle?binary=*:apple:*");
 //        String slotsVersion = VersionsUtil.createSlotsVersion(coordinator.getAllSlotsStatus(SlotFilterBuilder.build(uriInfo, false, ImmutableList.<UUID>of())));
-//        assertOkResponse(resource.setState("running", uriInfo), RUNNING, apple1SlotId, apple2SlotId);
-//    }
+//        assertOkResponse(resource.doLifecycle("running", uriInfo, slotsVersion), RUNNING, apple1SlotId, apple2SlotId);
+    }
 
     private void assertOkResponse(Response response, SlotLifecycleState state, UUID... slotIds)
     {
-        assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
+        assertTrue(response.getStatus() == Response.Status.OK.getStatusCode() || response.getStatus() == Response.Status.CREATED.getStatusCode());
+
+        JobStatus job = (JobStatus) response.getEntity();
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
         Builder<SlotStatusRepresentation> builder = ImmutableList.builder();
         for (UUID slotId : slotIds) {
             SlotStatus slotStatus = agentStatus.getSlotStatus(slotId);
-            builder.add(SlotStatusRepresentation.from(slotStatus.changeState(state), prefixSize, MOCK_REPO));
+            builder.add(SlotStatusRepresentation.from(slotStatus.changeState(state)));
             assertEquals(slotStatus.getAssignment(), APPLE_ASSIGNMENT);
         }
-        assertEqualsNoOrder((Collection<?>) response.getEntity(), builder.build());
+
+
+        assertEqualsNoOrder(Iterables.transform(job.getSlotJobStatuses(), slotStatusGetter()), builder.build());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
     }
 

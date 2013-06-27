@@ -27,7 +27,6 @@ import com.google.inject.util.Modules;
 import io.airlift.airship.agent.Agent;
 import io.airlift.airship.agent.Slot;
 import io.airlift.airship.coordinator.AgentProvisioningRepresentation;
-import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.CoordinatorMainModule;
 import io.airlift.airship.coordinator.CoordinatorProvisioningRepresentation;
 import io.airlift.airship.coordinator.HttpRemoteAgent;
@@ -39,11 +38,13 @@ import io.airlift.airship.coordinator.Provisioner;
 import io.airlift.airship.coordinator.StateManager;
 import io.airlift.airship.coordinator.StaticProvisionerModule;
 import io.airlift.airship.coordinator.TestingMavenRepository;
+import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.integration.MockLocalProvisioner.AgentServer;
 import io.airlift.airship.integration.MockLocalProvisioner.CoordinatorServer;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.HttpUriBuilder;
@@ -52,7 +53,6 @@ import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.SlotStatusRepresentation.SlotStatusRepresentationFactory;
-import io.airlift.airship.shared.UpgradeVersions;
 import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobId;
@@ -129,7 +129,7 @@ public class TestServerIntegration
     private final JsonCodec<List<SlotStatusRepresentation>> slotStatusesCodec = listJsonCodec(SlotStatusRepresentation.class);
     private final JsonCodec<CoordinatorProvisioningRepresentation> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRepresentation.class);
     private final JsonCodec<AgentProvisioningRepresentation> agentProvisioningCodec = jsonCodec(AgentProvisioningRepresentation.class);
-    private final JsonCodec<UpgradeVersions> upgradeVersionsCodec = jsonCodec(UpgradeVersions.class);
+    private final JsonCodec<Assignment> assignmentCodec = jsonCodec(Assignment.class);
 
     private File binaryRepoDir;
     private File localBinaryRepoDir;
@@ -520,11 +520,11 @@ public class TestServerIntegration
         Agent agent = initializeOneAgent();
         waitForAgentStatusPropagation(agent);
 
-        UpgradeVersions upgradeVersions = new UpgradeVersions("2.0", "@2.0");
+        Assignment upgradeVersions = new Assignment("2.0", "@2.0");
         Request request = Request.Builder.preparePost()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot/assignment").addParameter("binary", "*:apple:*").build())
                 .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .setBodyGenerator(jsonBodyGenerator(upgradeVersionsCodec, upgradeVersions))
+                .setBodyGenerator(jsonBodyGenerator(assignmentCodec, upgradeVersions))
                 .build();
         List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 

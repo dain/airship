@@ -2,14 +2,23 @@ package io.airlift.airship.coordinator;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import io.airlift.airship.coordinator.job.Stream;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.job.KillTask;
+import io.airlift.airship.shared.job.RestartTask;
+import io.airlift.airship.shared.job.SlotJob;
+import io.airlift.airship.shared.job.StartTask;
+import io.airlift.airship.shared.job.StopTask;
+import io.airlift.airship.shared.job.Task;
 import io.airlift.discovery.client.ServiceDescriptor;
 
 import java.net.URI;
@@ -18,6 +27,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Predicates.equalTo;
 import static io.airlift.airship.shared.AgentLifecycleState.OFFLINE;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
@@ -77,6 +87,35 @@ public class MockRemoteAgent implements RemoteAgent
     @Override
     public synchronized void setServiceInventory(List<ServiceDescriptor> serviceInventory)
     {
+    }
+
+    @Override
+    public RemoteSlotJob createSlotJob(SlotJob slotJob)
+    {
+        RemoteSlot slot = Stream.on(getSlots())
+                .select(Predicates.compose(equalTo(slotJob.getSlotId()), RemoteSlotFunctions.slotIdGetter()))
+                .only();
+
+        for (Task task : slotJob.getTasks()) {
+            if (task instanceof StopTask) {
+                slot.stop();
+            }
+            else if (task instanceof StartTask) {
+                slot.start();
+            }
+            else if (task instanceof RestartTask) {
+                slot.restart();
+            }
+            else if (task instanceof KillTask) {
+                slot.kill();
+            }
+            else {
+                throw new UnsupportedOperationException("not yet implemented: " + task.getClass().getName());
+            }
+        }
+
+        // todo: what uri to use?
+        return new MockRemoteSlotJob(URI.create("http://foo"), slotJob, SlotStatusRepresentation.from(slot.status()));
     }
 
     @Override

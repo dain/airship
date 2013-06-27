@@ -9,12 +9,11 @@ import com.google.common.net.InetAddresses;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.airship.agent.Agent;
 import io.airlift.airship.agent.DeploymentManagerFactory;
-import io.airlift.airship.agent.Slot;
 import io.airlift.airship.agent.DirectoryDeploymentManagerFactory;
 import io.airlift.airship.agent.LauncherLifecycleManager;
 import io.airlift.airship.agent.LifecycleManager;
 import io.airlift.airship.agent.Progress;
-import io.airlift.airship.coordinator.Coordinator;
+import io.airlift.airship.agent.Slot;
 import io.airlift.airship.coordinator.CoordinatorConfig;
 import io.airlift.airship.coordinator.HttpRepository;
 import io.airlift.airship.coordinator.HttpServiceInventory;
@@ -27,8 +26,10 @@ import io.airlift.airship.coordinator.RemoteAgentFactory;
 import io.airlift.airship.coordinator.RemoteCoordinator;
 import io.airlift.airship.coordinator.RemoteCoordinatorFactory;
 import io.airlift.airship.coordinator.RemoteSlot;
+import io.airlift.airship.coordinator.RemoteSlotJob;
 import io.airlift.airship.coordinator.ServiceInventory;
 import io.airlift.airship.coordinator.StateManager;
+import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
@@ -38,6 +39,7 @@ import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
 import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.discovery.client.ServiceDescriptor;
 import io.airlift.json.JsonCodec;
 import io.airlift.units.Duration;
@@ -379,6 +381,12 @@ public class CommanderFactory
         @Override
         public void setServiceInventory(List<ServiceDescriptor> serviceInventory)
         {
+        }
+
+        @Override
+        public RemoteSlotJob createSlotJob(SlotJob slotJob)
+        {
+            throw new UnsupportedOperationException("not yet implemented");
         }
     }
 

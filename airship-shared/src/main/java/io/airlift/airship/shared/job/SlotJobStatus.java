@@ -2,6 +2,7 @@ package io.airlift.airship.shared.job;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import io.airlift.airship.shared.SlotStatusRepresentation;
 
@@ -113,5 +114,17 @@ public class SlotJobStatus
                 .add("progress", progressPercentage)
                 .add("tasks", tasks)
                 .toString();
+    }
+
+    public static Function<SlotJobStatus, SlotStatusRepresentation> slotStatusGetter()
+    {
+        return new Function<SlotJobStatus, SlotStatusRepresentation>()
+        {
+            @Override
+            public SlotStatusRepresentation apply(SlotJobStatus input)
+            {
+                return input.getSlotStatus();
+            }
+        };
     }
 }

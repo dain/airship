@@ -15,7 +15,6 @@ package io.airlift.airship.agent;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.airship.shared.Assignment;
-import io.airlift.airship.shared.AssignmentRepresentation;
 import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
@@ -41,7 +40,7 @@ public class TestAssignmentResource
     private Agent agent;
     private static final Assignment APPLE_V2 = new Assignment("food.fruit:apple:2.0", "@apple:2.0");
     private static final InstallationRepresentation UPGRADE = new InstallationRepresentation("apple",
-            AssignmentRepresentation.from(APPLE_V2),
+            APPLE_V2,
             "fetch://binary.tar.gz",
             "fetch://config.config",
             ImmutableMap.of("memory", 512)

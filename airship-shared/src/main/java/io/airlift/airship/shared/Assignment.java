@@ -19,6 +19,9 @@ import com.google.common.base.Preconditions;
 
 import javax.annotation.concurrent.Immutable;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+
 @Immutable
 public class Assignment
 {
@@ -28,9 +31,6 @@ public class Assignment
     @JsonCreator
     public Assignment(@JsonProperty("binary") String binary, @JsonProperty("config") String config)
     {
-        Preconditions.checkNotNull(binary, "binary is null");
-        Preconditions.checkNotNull(config, "config is null");
-
         this.binary = binary;
         this.config = config;
     }
@@ -86,5 +86,44 @@ public class Assignment
         sb.append(", config=").append(config);
         sb.append('}');
         return sb.toString();
+    }
+
+
+    public Assignment upgradeAssignment(Repository repository, Assignment assignment)
+    {
+        Preconditions.checkNotNull(assignment, "assignment is null");
+
+        String newBinary = assignment.getBinary();
+        if (binary != null) {
+            newBinary = repository.binaryUpgrade(newBinary, binary);
+            checkArgument(newBinary != null, "Can not upgrade binary " + assignment.getBinary() + " to " + binary);
+        }
+        else {
+            checkArgument(repository.binaryToHttpUri(assignment.getBinary()) != null, "Can not locate existing binary " + assignment.getBinary() + " for upgrade");
+        }
+
+        String newConfig = assignment.getConfig();
+        if (config != null) {
+            newConfig = repository.configUpgrade(newConfig, config);
+            checkArgument(newConfig != null, "Can not upgrade config " + assignment.getConfig() + " to " + config);
+        }
+        else {
+            checkArgument(repository.configToHttpUri(assignment.getConfig()) != null, "Can not locate existing config " + assignment.getConfig() + " for upgrade");
+        }
+
+        return new Assignment(newBinary, newConfig);
+    }
+
+    public Assignment forceAssignment(Repository repository)
+    {
+        checkState((binary != null) && (config != null), "Binary and config must be specified to upgrade missing assignment");
+
+        String newBinary = repository.binaryResolve(binary);
+        checkArgument(newBinary != null, "Unknown binary " + binary);
+
+        String newConfig = repository.configResolve(config);
+        checkArgument(newConfig != null, "Unknown config " + config);
+
+        return new Assignment(newBinary, newConfig);
     }
 }

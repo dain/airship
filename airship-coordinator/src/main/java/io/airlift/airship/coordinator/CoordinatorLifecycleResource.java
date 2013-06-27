@@ -14,14 +14,12 @@
 package io.airlift.airship.coordinator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Lists;
 import com.google.inject.Inject;
-import io.airlift.airship.shared.Repository;
-import io.airlift.airship.shared.SlotLifecycleState;
-import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.LifecycleRequest;
 
-import javax.ws.rs.PUT;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
@@ -29,49 +27,35 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
-import java.util.List;
-import java.util.UUID;
-
-import static com.google.common.collect.Collections2.transform;
-import static io.airlift.airship.shared.SlotLifecycleState.UNKNOWN;
-import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
+import static io.airlift.airship.coordinator.job.JobInfoUtil.makeJobStatusResponse;
 
 @Path("/v1/slot/lifecycle")
 public class CoordinatorLifecycleResource
 {
     private final Coordinator coordinator;
-    private final Repository repository;
 
     @Inject
-    public CoordinatorLifecycleResource(Coordinator coordinator, Repository repository)
+    public CoordinatorLifecycleResource(Coordinator coordinator)
     {
         Preconditions.checkNotNull(coordinator, "coordinator must not be null");
-        Preconditions.checkNotNull(repository, "repository is null");
-
         this.coordinator = coordinator;
-        this.repository = repository;
     }
 
-    @PUT
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response setState(String newState, @Context UriInfo uriInfo)
+    public Response doLifecycle(LifecycleRequest request, @Context UriInfo uriInfo)
     {
-        Preconditions.checkNotNull(newState, "newState must not be null");
+        Preconditions.checkNotNull(request, "request must not be null");
 
-        SlotLifecycleState state = SlotLifecycleState.lookup(newState);
-        if (state == null || state == UNKNOWN) {
-            return Response.status(Response.Status.BAD_REQUEST).build();
+        if (request.getSlots().isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("No slots selected")
+                    .build();
         }
 
-        // build filter
-        List<UUID> uuids = Lists.transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter());
-        Predicate<SlotStatus> slotFilter = SlotFilterBuilder.build(uriInfo, true, uuids);
+        JobStatus jobStatus = coordinator.doLifecycle(request.getSlots(), request.getAction());
 
-        // set slot state
-        List<SlotStatus> results = coordinator.setState(state, slotFilter, null);
-
-        // build response
-        return Response.ok(transform(results, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .build();
-     }
+        return makeJobStatusResponse(Response.Status.CREATED, uriInfo, jobStatus);
+    }
 }

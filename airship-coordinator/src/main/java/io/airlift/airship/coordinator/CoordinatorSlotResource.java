@@ -17,9 +17,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
-import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.Assignment;
-import io.airlift.airship.shared.AssignmentRepresentation;
+import io.airlift.airship.coordinator.job.InstallationRequest;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotStatus;
 
@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.google.common.collect.Lists.transform;
-import static io.airlift.airship.shared.AgentStatus.idGetter;
+import static io.airlift.airship.coordinator.job.JobInfoUtil.makeJobStatusResponse;
 import static io.airlift.airship.shared.SlotStatus.uuidGetter;
 import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
 
@@ -82,44 +82,32 @@ public class CoordinatorSlotResource
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response install(
-            AssignmentRepresentation assignmentRepresentation,
+            InstallationRequest request,
             @DefaultValue("1") @QueryParam("limit") int limit,
             @Context UriInfo uriInfo)
     {
-        Preconditions.checkNotNull(assignmentRepresentation, "assignmentRepresentation must not be null");
+        Preconditions.checkNotNull(request, "request must not be null");
         Preconditions.checkArgument(limit > 0, "limit must be at least 1");
 
-        Assignment assignment = assignmentRepresentation.toAssignment();
-
-        // select the target agents
-        Predicate<AgentStatus> agentFilter = AgentFilterBuilder.build(uriInfo,
-                transform(coordinator.getAgents(), idGetter()),
-                transform(coordinator.getAllSlotStatus(), uuidGetter()),
-                false,
-                repository);
-        List<AgentStatus> agents = coordinator.getAgents(agentFilter);
+        if (request.getIdsAndVersions().isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("No agents selected")
+                    .build();
+        }
 
         // install the software
-        List<SlotStatus> slots = coordinator.install(agentFilter, limit, assignment);
+        JobStatus job = coordinator.install(request.getIdsAndVersions(), limit, request.getAssignment());
 
-        // calculate unique prefix size with the new slots included
-        return Response.ok(transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .build();
+        return makeJobStatusResponse(Response.Status.CREATED, uriInfo, job);
     }
 
     @DELETE
     @Produces(MediaType.APPLICATION_JSON)
-    public Response terminateSlots(@Context UriInfo uriInfo)
+    public Response terminateSlots(@Context UriInfo uriInfo, List<IdAndVersion> slots)
     {
-        // build filter
-        List<UUID> uuids = transform(coordinator.getAllSlotStatus(), uuidGetter());
-        Predicate<SlotStatus> slotFilter = SlotFilterBuilder.build(uriInfo, true, uuids);
-
         // terminate slots
-        List<SlotStatus> result = coordinator.terminate(slotFilter, null);
+        JobStatus job = coordinator.terminate(slots);
 
-        // build response
-        return Response.ok(transform(result, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .build();
+        return makeJobStatusResponse(Response.Status.CREATED, uriInfo, job);
     }
 }

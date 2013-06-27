@@ -556,4 +556,28 @@ public class SlotStatusRepresentation
         sb.append('}');
         return sb.toString();
     }
+
+    public static Function<SlotStatusRepresentation, IdAndVersion> slotToIdWithVersion()
+    {
+        return new Function<SlotStatusRepresentation, IdAndVersion>()
+        {
+            @Override
+            public IdAndVersion apply(SlotStatusRepresentation input)
+            {
+                return new IdAndVersion(input.getId().toString(), input.getVersion());
+            }
+        };
+    }
+
+    public static Function<SlotStatusRepresentation, IdAndVersion> slotToIdWithoutVersion()
+    {
+        return new Function<SlotStatusRepresentation, IdAndVersion>()
+        {
+            @Override
+            public IdAndVersion apply(SlotStatusRepresentation input)
+            {
+                return new IdAndVersion(input.getId().toString(), null);
+            }
+        };
+    }
 }

@@ -17,20 +17,31 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.inject.Inject;
-import io.airlift.airship.coordinator.AgentFilterBuilder.StatePredicate;
+import io.airlift.airship.coordinator.job.Job;
+import io.airlift.airship.coordinator.job.JobId;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.SlotLifecycleAction;
+import io.airlift.airship.coordinator.job.Stream;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.ExpectedSlotStatus;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.InstallationUtils;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.UpgradeVersions;
+import io.airlift.airship.shared.job.InstallTask;
+import io.airlift.airship.shared.job.KillTask;
+import io.airlift.airship.shared.job.RestartTask;
+import io.airlift.airship.shared.job.SlotJob;
+import io.airlift.airship.shared.job.SlotJobId;
+import io.airlift.airship.shared.job.StartTask;
+import io.airlift.airship.shared.job.StopTask;
+import io.airlift.airship.shared.job.Task;
 import io.airlift.discovery.client.ServiceDescriptor;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.log.Logger;
@@ -39,19 +50,14 @@ import io.airlift.units.Duration;
 
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
-
-import java.net.URI;
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -63,20 +69,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
-import static io.airlift.airship.shared.SlotLifecycleState.KILLING;
-import static io.airlift.airship.shared.SlotLifecycleState.RESTARTING;
+import static io.airlift.airship.shared.IdAndVersion.idGetter;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
-import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
 import static io.airlift.airship.shared.SlotLifecycleState.UNKNOWN;
-import static io.airlift.airship.shared.VersionsUtil.checkSlotsVersion;
 
 public class Coordinator
 {
@@ -96,6 +101,12 @@ public class Coordinator
     private final StateManager stateManager;
     private final boolean allowDuplicateInstallationsOnAnAgent;
     private final ExecutorService executor;
+
+
+    private final AtomicLong nextJobId = new AtomicLong();
+    private final AtomicLong nextSlotJobId = new AtomicLong();
+
+    private final ConcurrentMap<JobId, Job> jobs = new ConcurrentHashMap<>();
 
     @Inject
     public Coordinator(NodeInfo nodeInfo,
@@ -345,7 +356,8 @@ public class Coordinator
                 continue;
             }
 
-            RemoteCoordinator remoteCoordinator = remoteCoordinatorFactory.createRemoteCoordinator(instance, instance.getInternalUri() != null ? CoordinatorLifecycleState.ONLINE : CoordinatorLifecycleState.OFFLINE);
+            RemoteCoordinator remoteCoordinator = remoteCoordinatorFactory.createRemoteCoordinator(instance,
+                    instance.getInternalUri() != null ? CoordinatorLifecycleState.ONLINE : CoordinatorLifecycleState.OFFLINE);
             RemoteCoordinator existing = coordinators.putIfAbsent(instance.getInstanceId(), remoteCoordinator);
             if (existing != null) {
                 existing.setInternalUri(instance.getInternalUri());
@@ -437,8 +449,8 @@ public class Coordinator
     public AgentStatus terminateAgent(String agentId)
     {
         RemoteAgent agent = null;
-        for (Iterator<Entry<String, RemoteAgent>> iterator = agents.entrySet().iterator(); iterator.hasNext(); ) {
-            Entry<String, RemoteAgent> entry = iterator.next();
+        for (Iterator<Map.Entry<String, RemoteAgent>> iterator = agents.entrySet().iterator(); iterator.hasNext(); ) {
+            Map.Entry<String, RemoteAgent> entry = iterator.next();
             if (entry.getValue().status().getAgentId().equals(agentId)) {
                 iterator.remove();
                 agent = entry.getValue();
@@ -457,29 +469,30 @@ public class Coordinator
         return agent.status().changeState(AgentLifecycleState.TERMINATED);
     }
 
-    public List<SlotStatus> install(Predicate<AgentStatus> filter, int limit, Assignment assignment)
+    public JobStatus install(List<IdAndVersion> agents, int limit, Assignment assignment)
     {
-        final Installation installation = InstallationUtils.toInstallation(repository, assignment);
-
-        List<RemoteAgent> targetAgents = new ArrayList<>(selectAgents(filter, installation));
-        targetAgents = targetAgents.subList(0, Math.min(targetAgents.size(), limit));
-
-        return parallel(targetAgents, new Function<RemoteAgent, SlotStatus>()
-        {
-            @Override
-            public SlotStatus apply(RemoteAgent agent)
-            {
-                SlotStatus slotStatus = agent.install(installation);
-                stateManager.setExpectedState(new ExpectedSlotStatus(slotStatus.getId(), STOPPED, installation.getAssignment()));
-                return slotStatus;
-            }
-        });
+        throw new UnsupportedOperationException("not yet implemented");
+        //        final Installation installation = InstallationUtils.toInstallation(repository, assignment);
+        //
+        //        List<RemoteAgent> targetAgents = new ArrayList<>(selectAgents(agents, installation));
+        //        targetAgents = targetAgents.subList(0, Math.min(targetAgents.size(), limit));
+        //
+        //        return parallel(targetAgents, new Function<RemoteAgent, SlotStatus>()
+        //        {
+        //            @Override
+        //            public SlotStatus apply(RemoteAgent agent)
+        //            {
+        //                SlotStatus slotStatus = agent.install(installation);
+        //                stateManager.setExpectedState(new ExpectedSlotStatus(slotStatus.getId(), STOPPED, installation.getAssignment()));
+        //                return slotStatus;
+        //            }
+        //        });
     }
 
     private List<RemoteAgent> selectAgents(Predicate<AgentStatus> filter, Installation installation)
     {
         // select only online agents
-        filter = Predicates.and(filter, new StatePredicate(AgentLifecycleState.ONLINE));
+        filter = Predicates.and(filter, new AgentFilterBuilder.StatePredicate(AgentLifecycleState.ONLINE));
         List<RemoteAgent> allAgents = newArrayList(filter(this.agents.values(), filterAgentsBy(filter)));
         if (allAgents.isEmpty()) {
             throw new IllegalStateException("No online agents match the provided filters.");
@@ -515,174 +528,55 @@ public class Coordinator
         return targetAgents;
     }
 
-    public List<SlotStatus> upgrade(Predicate<SlotStatus> filter, UpgradeVersions upgradeVersions, String expectedSlotsVersion, boolean force)
+    public JobStatus terminate(List<IdAndVersion> slots)
     {
-        List<RemoteSlot> filteredSlots = selectRemoteSlots(filter, expectedSlotsVersion);
-
-        final Map<UUID, Assignment> newAssignments = new HashMap<>();
-        List<RemoteSlot> slotsToUpgrade = new ArrayList<>();
-        for (RemoteSlot slot : filteredSlots) {
-            SlotStatus status = slot.status();
-            SlotLifecycleState state = status.getState();
-            if (state == TERMINATED) {
-                // should never happen but be safe
-                continue;
-            }
-            if ((!force) && (state == UNKNOWN)) {
-                // slots in unknown state are not safe to upgrade (might still be running)
-                continue;
-            }
-            Assignment assignment;
-            if (force && (status.getAssignment() == null)) {
-                // allow forced upgrading if existing assignment is missing
-                assignment = upgradeVersions.forceAssignment(repository);
-            }
-            else {
-                assignment = upgradeVersions.upgradeAssignment(repository, status.getAssignment());
-            }
-            newAssignments.put(slot.getId(), assignment);
-            slotsToUpgrade.add(slot);
-        }
-
-        // no slots to upgrade
-        if (newAssignments.isEmpty()) {
-            return ImmutableList.of();
-        }
-
-        // assure that new assignments all have the same binary (ignoring version)
-        if (!sameBinary(newAssignments.values())) {
-            TreeSet<String> binaries = new TreeSet<>();
-            for (RemoteSlot slot : filteredSlots) {
-                binaries.add(slot.status().getAssignment().getBinary());
-            }
-            throw new IllegalArgumentException("Expected a target slots for upgrade command to have a single binary, but found: " + Joiner.on(", ").join(binaries));
-        }
-
-        return parallelCommand(slotsToUpgrade, new Function<RemoteSlot, SlotStatus>()
-        {
-            @Override
-            public SlotStatus apply(RemoteSlot slot)
-            {
-                boolean expectRestart = slot.status().getState() == RUNNING;
-
-                Assignment assignment = newAssignments.get(slot.getId());
-                Preconditions.checkState(assignment != null, "Error no assignment for slot " + slot.getId());
-
-                URI configFile = repository.configToHttpUri(assignment.getConfig());
-
-                Installation installation = new Installation(
-                        repository.configShortName(assignment.getConfig()),
-                        assignment,
-                        repository.binaryToHttpUri(assignment.getBinary()),
-                        configFile, ImmutableMap.<String, Integer>of());
-
-                stateManager.setExpectedState(new ExpectedSlotStatus(slot.getId(), expectRestart ? RUNNING : STOPPED, installation.getAssignment()));
-                SlotStatus slotStatus = slot.assign(installation);
-                return slotStatus;
-            }
-        }) ;
+        throw new UnsupportedOperationException("not yet implemented");
+        //        Preconditions.checkNotNull(slots, "slots is null");
+        //
+        //        // slots the slots
+        //        List<RemoteSlot> filteredSlots = selectRemoteSlots(slots);
+        //
+        //        return parallelCommand(filteredSlots, new Function<RemoteSlot, SlotStatus>()
+        //        {
+        //            @Override
+        //            public SlotStatus apply(RemoteSlot slot)
+        //            {
+        //                SlotStatus slotStatus = slot.terminate();
+        //                if (slotStatus.getState() == TERMINATED) {
+        //                    stateManager.deleteExpectedState(slotStatus.getId());
+        //                }
+        //                return slotStatus;
+        //            }
+        //        });
     }
 
-    private boolean sameBinary(Collection<Assignment> values)
+    public JobStatus resetExpectedState(List<IdAndVersion> slots)
     {
-        if (values.size() < 2) {
-            return true;
-        }
-        final Assignment assignment = Iterables.getFirst(values, null);
-        return Iterables.all(values, new Predicate<Assignment>() {
-            @Override
-            public boolean apply(@Nullable Assignment input)
-            {
-                return repository.binaryEqualsIgnoreVersion(input.getBinary(), assignment.getBinary());
-            }
-        });
+        throw new UnsupportedOperationException("not yet implemented");
+        //
+        //        // filter the slots
+        //        List<SlotStatus> filteredSlots = getAllSlotsStatus(filter);
+        //
+        //        return ImmutableList.copyOf(transform(filteredSlots, new Function<SlotStatus, SlotStatus>()
+        //        {
+        //            @Override
+        //            public SlotStatus apply(SlotStatus slotStatus)
+        //            {
+        //                if (slotStatus.getState() != SlotLifecycleState.UNKNOWN) {
+        //                    stateManager.setExpectedState(new ExpectedSlotStatus(slotStatus.getId(), slotStatus.getState(), slotStatus.getAssignment()));
+        //                }
+        //                else {
+        //                    stateManager.deleteExpectedState(slotStatus.getId());
+        //                }
+        //                return slotStatus;
+        //            }
+        //        }));
     }
 
-    public List<SlotStatus> terminate(Predicate<SlotStatus> filter, String expectedSlotsVersion)
-    {
-        Preconditions.checkNotNull(filter, "filter is null");
-
-        // filter the slots
-        List<RemoteSlot> filteredSlots = selectRemoteSlots(filter, expectedSlotsVersion);
-
-        return parallelCommand(filteredSlots, new Function<RemoteSlot, SlotStatus>()
-        {
-            @Override
-            public SlotStatus apply(RemoteSlot slot)
-            {
-                SlotStatus slotStatus = slot.terminate();
-                if (slotStatus.getState() == TERMINATED) {
-                    stateManager.deleteExpectedState(slotStatus.getId());
-                }
-                return slotStatus;
-            }
-        });
-    }
-
-    public List<SlotStatus> setState(final SlotLifecycleState state, Predicate<SlotStatus> filter, String expectedSlotsVersion)
-    {
-        Preconditions.checkArgument(EnumSet.of(RUNNING, RESTARTING, STOPPED, KILLING).contains(state), "Unsupported lifecycle state: " + state);
-
-        // filter the slots
-        List<RemoteSlot> filteredSlots = selectRemoteSlots(filter, expectedSlotsVersion);
-
-        return parallelCommand(filteredSlots, new Function<RemoteSlot, SlotStatus>()
-        {
-            @Override
-            public SlotStatus apply(RemoteSlot slot)
-            {
-                switch (state) {
-                    case RUNNING:
-                        stateManager.setExpectedState(new ExpectedSlotStatus(slot.getId(), RUNNING, slot.status().getAssignment()));
-                        return slot.start();
-                    case RESTARTING:
-                        stateManager.setExpectedState(new ExpectedSlotStatus(slot.getId(), RUNNING, slot.status().getAssignment()));
-                        return slot.restart();
-                    case STOPPED:
-                        stateManager.setExpectedState(new ExpectedSlotStatus(slot.getId(), STOPPED, slot.status().getAssignment()));
-                        return slot.stop();
-                    case KILLING:
-                        stateManager.setExpectedState(new ExpectedSlotStatus(slot.getId(), KILLING, slot.status().getAssignment()));
-                        return slot.kill();
-                    default:
-                        throw new IllegalArgumentException("Unexpected state transition " + state);
-                }
-            }
-        });
-    }
-
-    public List<SlotStatus> resetExpectedState(Predicate<SlotStatus> filter, String expectedSlotsVersion)
-    {
-        // filter the slots
-        List<SlotStatus> filteredSlots = getAllSlotsStatus(filter);
-
-        // verify the state of the system hasn't changed
-        checkSlotsVersion(expectedSlotsVersion, filteredSlots);
-
-        return ImmutableList.copyOf(transform(filteredSlots, new Function<SlotStatus, SlotStatus>()
-        {
-            @Override
-            public SlotStatus apply(SlotStatus slotStatus)
-            {
-                if (slotStatus.getState() != SlotLifecycleState.UNKNOWN) {
-                    stateManager.setExpectedState(new ExpectedSlotStatus(slotStatus.getId(), slotStatus.getState(), slotStatus.getAssignment()));
-                }
-                else {
-                    stateManager.deleteExpectedState(slotStatus.getId());
-                }
-                return slotStatus;
-            }
-        }));
-    }
-
-    private List<RemoteSlot> selectRemoteSlots(Predicate<SlotStatus> filter, String expectedSlotsVersion)
+    private List<RemoteSlot> selectRemoteSlots(Predicate<SlotStatus> filter)
     {
         // filter the slots
         List<RemoteSlot> filteredSlots = ImmutableList.copyOf(filter(getAllSlots(), filterSlotsBy(filter)));
-
-        // verify the state of the system hasn't changed
-        checkSlotsVersion(expectedSlotsVersion, getAllSlotsStatus(filter, filteredSlots));
-
         return filteredSlots;
     }
 
@@ -756,6 +650,121 @@ public class Coordinator
         }
 
         return stats;
+    }
+
+    public JobStatus doLifecycle(List<IdAndVersion> selectedSlots, SlotLifecycleAction action)
+    {
+        Set<UUID> slotIds = Stream.on(selectedSlots)
+                .transform(idGetter())
+                .transform(stringToUuidFunction())
+                .set();
+
+        // 1. record new expected state
+        // TODO: deal with read-modify-update race condition when updating expected state
+        Collection<ExpectedSlotStatus> expectedStates = stateManager.getAllExpectedStates();
+        Iterable<ExpectedSlotStatus> toUpdate = Iterables.filter(expectedStates, Predicates.compose(in(slotIds), ExpectedSlotStatus.uuidGetter()));
+        for (ExpectedSlotStatus currentExpectedStatus : toUpdate) {
+            SlotLifecycleState status;
+            switch (action) {
+                case STOP:
+                case KILL:
+                    status = STOPPED;
+                    break;
+                case START:
+                case RESTART:
+                    status = RUNNING;
+                    break;
+                default:
+                    throw new UnsupportedOperationException("not yet implemented: " + action);
+            }
+
+            ExpectedSlotStatus updatedStatus = new ExpectedSlotStatus(currentExpectedStatus.getId(), status, currentExpectedStatus.getAssignment());
+            stateManager.setExpectedState(updatedStatus);
+        }
+
+
+        // 2. create a job for each slot (slot id + tasks)
+        List<RemoteSlotJob> slotJobs = new ArrayList<>();
+        for (IdAndVersion slot : selectedSlots) {
+            RemoteAgent agent = getAgentForSlot(UUID.fromString(slot.getId()));
+
+            if (agent == null) {
+                // TODO: create failed job
+            }
+            else {
+                RemoteSlotJob slotJob = agent.createSlotJob(new SlotJob(nextSlotJobId(), UUID.fromString(slot.getId()), plan(action)));
+                slotJobs.add(slotJob);
+            }
+        }
+
+        JobId jobId = nextJobId();
+        Job job = new Job(jobId, slotJobs);
+
+        jobs.putIfAbsent(jobId, job);
+
+        return job.getStatus();
+    }
+
+
+    private RemoteAgent getAgentForSlot(UUID slotId)
+    {
+        for (RemoteAgent agent : agents.values()) {
+            for (RemoteSlot slot : agent.getSlots()) {
+                if (slot.getId().equals(slotId)) {
+                    return agent;
+                }
+            }
+        }
+
+        return null;
+    }
+    
+    public JobStatus upgrade(Assignment assignments, List<IdAndVersion> selectedSlots, boolean force)
+    {
+        Set<UUID> slotIds = Stream.on(selectedSlots)
+                .transform(idGetter())
+                .transform(stringToUuidFunction())
+                .set();
+
+        Map<UUID, SlotStatus> actualStatus = Maps.uniqueIndex(getAllSlotStatus(), SlotStatus.uuidGetter());
+
+        List<SlotJob> slotJobs = new ArrayList<>();
+
+        // 1. record new expected state
+        // TODO: deal with read-modify-update race condition when updating expected state
+        Collection<ExpectedSlotStatus> expectedStates = stateManager.getAllExpectedStates();
+        Iterable<ExpectedSlotStatus> toUpdate = Iterables.filter(expectedStates, Predicates.compose(in(slotIds), ExpectedSlotStatus.uuidGetter()));
+        for (ExpectedSlotStatus currentExpectedStatus : toUpdate) {
+            String binary = assignments.getBinary();
+            if (binary == null) {
+                binary = currentExpectedStatus.getBinary();
+            }
+
+            String config = assignments.getConfig();
+            if (config == null) {
+                config = currentExpectedStatus.getConfig();
+            }
+
+            UUID slotId = currentExpectedStatus.getId();
+            Assignment assignment = new Assignment(binary, config);
+
+            ExpectedSlotStatus updatedStatus = new ExpectedSlotStatus(slotId, currentExpectedStatus.getStatus(), assignment);
+            stateManager.setExpectedState(updatedStatus);
+
+            // todo: pass version
+            SlotJob job = new SlotJob(nextSlotJobId(), slotId, plan(actualStatus.get(slotId), assignment));
+            slotJobs.add(job);
+        }
+
+        // 3. attach the job to the agent that owns the slot
+        // todo
+
+        throw new UnsupportedOperationException("not yet implemented");
+    }
+
+    public JobStatus getJobStatus(JobId id)
+    {
+        return jobs.get(id).getStatus();
     }
 
     private Predicate<RemoteSlot> filterSlotsBy(final Predicate<SlotStatus> filter)
@@ -922,6 +931,76 @@ public class Coordinator
         }
     }
 
+    private List<Task> plan(SlotStatus current, Assignment assignment)
+    {
+        if (current.getAssignment().equals(assignment)) {
+            // todo: plan anyway if in force mode?
+            return ImmutableList.of();
+        }
+
+
+        List<Task> plan = new ArrayList<>();
+
+        if (current.getState() == RUNNING) {
+            plan.add(new StopTask());
+        }
+
+        plan.add(new InstallTask(InstallationUtils.toInstallation(repository, assignment)));
+
+        if (current.getState() == RUNNING) {
+            plan.add(new StartTask());
+        }
+
+        return plan;
+    }
+
+    private List<Task> plan(SlotLifecycleAction action)
+    {
+        Task task;
+        switch (action) {
+            case STOP:
+                task = new StopTask();
+                break;
+            case START:
+                task = new StartTask();
+                break;
+            case RESTART:
+                task = new RestartTask();
+                break;
+            case KILL:
+                task = new KillTask();
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported lifecycle action: " + action);
+        }
+
+        return ImmutableList.of(task);
+    }
+
+    private JobId nextJobId()
+    {
+        return new JobId(Long.toString(nextJobId.incrementAndGet()));
+    }
+
+    private SlotJobId nextSlotJobId()
+    {
+        return new SlotJobId(Long.toString(nextSlotJobId.incrementAndGet()));
+    }
+
+    private Function<String, UUID> stringToUuidFunction()
+    {
+        return new Function<String, UUID>()
+        {
+            @Override
+            public UUID apply(String input)
+            {
+                return UUID.fromString(input);
+            }
+        };
+    }
+
+
+
     private static class CallableFunction<F, T>
             implements Callable<T>
     {
@@ -941,4 +1020,5 @@ public class Coordinator
         }
 
     }
+
 }

@@ -187,6 +187,7 @@ public class HttpRemoteAgent
         }));
     }
 
+    @Override
     public HttpRemoteSlotJob createSlotJob(SlotJob slotJob)
     {
         return slotJobFactory.createHttpRemoteSlotJob(this.status().getInternalUri(), slotJob);

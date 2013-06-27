@@ -1,14 +1,16 @@
 package io.airlift.airship.coordinator;
 
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatus;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.units.Duration;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -330,14 +332,15 @@ public class TestCoordinator
     public void testInstallWithinShortBinarySpec()
     {
         URI agentUri = URI.create("fake://appleServer1/");
-        provisioner.addAgent(UUID.randomUUID().toString(), agentUri, ImmutableMap.of("cpu", 1, "memory", 512));
+        provisioner.addAgent("instance-id", agentUri, ImmutableMap.of("cpu", 1, "memory", 512));
         coordinator.updateAllAgents();
 
-        List<SlotStatus> slots = coordinator.install(Predicates.<AgentStatus>alwaysTrue(), 1, SHORT_APPLE_ASSIGNMENT);
+        JobStatus job = coordinator.install(IdAndVersion.forIds("instance-id"), 1, SHORT_APPLE_ASSIGNMENT);
 
-        assertEquals(slots.size(), 1);
-        for (SlotStatus slot : slots) {
-            assertAppleSlot(slot);
+        AgentStatus agent = coordinator.getAgents().get(0);
+        assertEquals(job.getSlotJobStatuses().size(), 1);
+        for (SlotJobStatus slotJob : job.getSlotJobStatuses()) {
+            assertAppleSlot(slotJob.getSlotStatus().toSlotStatus(agent.getInstanceId()));
         }
     }
 
@@ -349,11 +352,12 @@ public class TestCoordinator
         provisioner.addAgent("instance-id", agentUri, ImmutableMap.of("cpu", 1, "memory", 512));
         coordinator.updateAllAgents();
 
-        List<SlotStatus> slots = coordinator.install(Predicates.<AgentStatus>alwaysTrue(), 1, APPLE_ASSIGNMENT);
+        JobStatus job = coordinator.install(IdAndVersion.forIds("instance-id"), 1, APPLE_ASSIGNMENT);
 
-        assertEquals(slots.size(), 1);
-        for (SlotStatus slot : slots) {
-            assertAppleSlot(slot);
+        AgentStatus agent = coordinator.getAgents().get(0);
+        assertEquals(job.getSlotJobStatuses().size(), 1);
+        for (SlotJobStatus slotJob : job.getSlotJobStatuses()) {
+            assertAppleSlot(slotJob.getSlotStatus().toSlotStatus(agent.getInstanceId()));
         }
     }
 
@@ -365,11 +369,12 @@ public class TestCoordinator
         provisioner.addAgent("instance-id", agentUri);
         coordinator.updateAllAgents();
 
-        List<SlotStatus> slots = coordinator.install(Predicates.<AgentStatus>alwaysTrue(), 1, APPLE_ASSIGNMENT);
+        JobStatus job = coordinator.install(IdAndVersion.forIds("instance-id"), 1, APPLE_ASSIGNMENT);
 
-        assertEquals(slots.size(), 1);
-        for (SlotStatus slot : slots) {
-            assertAppleSlot(slot);
+        AgentStatus agent = coordinator.getAgents().get(0);
+        assertEquals(job.getSlotJobStatuses().size(), 1);
+        for (SlotJobStatus slotJob : job.getSlotJobStatuses()) {
+            assertAppleSlot(slotJob.getSlotStatus().toSlotStatus(agent.getInstanceId()));
         }
     }
 
@@ -381,7 +386,7 @@ public class TestCoordinator
         provisioner.addAgent("instance-id", agentUri, ImmutableMap.of("cpu", 0, "memory", 0));
         coordinator.updateAllAgents();
 
-        coordinator.install(Predicates.<AgentStatus>alwaysTrue(), 1, APPLE_ASSIGNMENT);
+        coordinator.install(IdAndVersion.forIds("instance-id"), 1, APPLE_ASSIGNMENT);
     }
 
     @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "No agents have the available resources to run the specified binary and configuration.")
@@ -392,12 +397,13 @@ public class TestCoordinator
         coordinator.updateAllAgents();
 
         // install an apple server
-        List<SlotStatus> slots = coordinator.install(Predicates.<AgentStatus>alwaysTrue(), 1, APPLE_ASSIGNMENT);
-        assertEquals(slots.size(), 1);
-        assertAppleSlot(Iterables.get(slots, 0));
+        AgentStatus agent = coordinator.getAgents().get(0);
+        JobStatus job = coordinator.install(IdAndVersion.forIds("instance-id"), 1, APPLE_ASSIGNMENT);
+        assertEquals(job.getSlotJobStatuses().size(), 1);
+        assertAppleSlot(Iterables.get(job.getSlotJobStatuses(), 0).getSlotStatus().toSlotStatus(agent.getInstanceId()));
 
         // try to install a banana server which will fail
-        coordinator.install(Predicates.<AgentStatus>alwaysTrue(), 1, BANANA_ASSIGNMENT);
+        coordinator.install(IdAndVersion.forIds("instance-id"), 1, BANANA_ASSIGNMENT);
     }
 
     private void assertAppleSlot(SlotStatus slot)

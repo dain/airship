@@ -1,33 +1,34 @@
 package io.airlift.airship.cli;
 
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
-import io.airlift.airship.shared.SlotLifecycleState;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.UpgradeVersions;
 
 import java.util.List;
 
 public interface Commander
 {
-    CommanderResponse<List<SlotStatusRepresentation>> show(SlotFilter slotFilter);
+    List<SlotStatusRepresentation> show(SlotFilter slotFilter);
 
-    List<SlotStatusRepresentation> install(AgentFilter agentFilter, int count, Assignment assignment, String expectedVersion);
+    JobStatus install(List<IdAndVersion> agents, int count, Assignment assignment);
 
-    List<SlotStatusRepresentation> upgrade(SlotFilter slotFilter, UpgradeVersions upgradeVersions, String expectedVersion, boolean force);
+    JobStatus upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force);
 
-    List<SlotStatusRepresentation> setState(SlotFilter slotFilter, SlotLifecycleState state, String expectedVersion);
+    JobStatus setState(List<IdAndVersion> slots, SlotLifecycleAction state);
 
-    List<SlotStatusRepresentation> terminate(SlotFilter slotFilter, String expectedVersion);
+    JobStatus terminate(List<IdAndVersion> slots);
 
-    List<SlotStatusRepresentation> resetExpectedState(SlotFilter slotFilter, String expectedVersion);
+    JobStatus resetExpectedState(List<IdAndVersion> slots);
 
     boolean ssh(SlotFilter slotFilter, String command);
 
     List<CoordinatorStatusRepresentation> showCoordinators(CoordinatorFilter coordinatorFilter);
 
-    List<CoordinatorStatusRepresentation> provisionCoordinators(String coordinatorConfig,
+    JobStatus provisionCoordinators(String coordinatorConfig,
             int coordinatorCount,
             String instanceType,
             String availabilityZone,
@@ -38,9 +39,9 @@ public interface Commander
 
     boolean sshCoordinator(CoordinatorFilter coordinatorFilter, String command);
 
-    CommanderResponse<List<AgentStatusRepresentation>> showAgents(AgentFilter agentFilter);
+    List<AgentStatusRepresentation> showAgents(AgentFilter agentFilter);
 
-    List<AgentStatusRepresentation> provisionAgents(String agentConfig,
+    JobStatus provisionAgents(String agentConfig,
             int agentCount,
             String instanceType,
             String availabilityZone,
@@ -49,7 +50,7 @@ public interface Commander
             String securityGroup,
             boolean waitForStartup);
 
-    AgentStatusRepresentation terminateAgent(String agentId);
+    JobStatus terminateAgent(String agentId);
 
     boolean sshAgent(AgentFilter agentFilter, String command);
 }

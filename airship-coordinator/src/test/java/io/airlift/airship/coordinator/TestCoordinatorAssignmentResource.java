@@ -16,12 +16,14 @@ package io.airlift.airship.coordinator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.airship.coordinator.job.InstallationRequest;
+import io.airlift.airship.shared.Assignment;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.UpgradeVersions;
 import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
@@ -76,7 +78,7 @@ public class TestCoordinatorAssignmentResource
                 provisioner,
                 new InMemoryStateManager(),
                 new MockServiceInventory());
-        resource = new CoordinatorAssignmentResource(coordinator, MOCK_REPO);
+        resource = new CoordinatorAssignmentResource(coordinator);
 
         apple1SlotId = UUID.randomUUID();
         SlotStatus appleSlotStatus1 = createSlotStatus(apple1SlotId,
@@ -133,25 +135,25 @@ public class TestCoordinatorAssignmentResource
     @Test
     public void testUpgradeBoth()
     {
-        testUpgrade(new UpgradeVersions("2.0", "2,0"));
+        testUpgrade(new Assignment("2.0", "2,0"));
     }
 
     @Test
     public void testUpgradeBinary()
     {
-        testUpgrade(new UpgradeVersions("2.0", null));
+        testUpgrade(new Assignment("2.0", null));
     }
 
     @Test
     public void testUpgradeConfig()
     {
-        testUpgrade(new UpgradeVersions(null, "2.0"));
+        testUpgrade(new Assignment(null, "2.0"));
     }
 
-    private void testUpgrade(UpgradeVersions upgradeVersions)
+    private void testUpgrade(Assignment assignment)
     {
-        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment?host=apple*");
-        Response response = resource.upgrade(upgradeVersions, uriInfo, false);
+        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
+        Response response = resource.upgrade(new InstallationRequest(assignment, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo, false);
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
         SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
@@ -165,25 +167,25 @@ public class TestCoordinatorAssignmentResource
         assertEquals(apple2Status.getState(), STOPPED);
         assertEquals(bananaStatus.getState(), STOPPED);
 
-        assertEquals(apple1Status.getAssignment(), upgradeVersions.upgradeAssignment(MOCK_REPO, APPLE_ASSIGNMENT));
-        assertEquals(apple2Status.getAssignment(), upgradeVersions.upgradeAssignment(MOCK_REPO, APPLE_ASSIGNMENT));
+        assertEquals(apple1Status.getAssignment(), assignment.upgradeAssignment(MOCK_REPO, APPLE_ASSIGNMENT));
+        assertEquals(apple2Status.getAssignment(), assignment.upgradeAssignment(MOCK_REPO, APPLE_ASSIGNMENT));
         assertEquals(bananaStatus.getAssignment(), BANANA_ASSIGNMENT);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = ".* single binary.*food.fruit:apple:1.0, food.fruit:banana:2.0-SNAPSHOT")
     public void testUpgradeDifferentBinaries()
     {
-        UpgradeVersions upgradeVersions = new UpgradeVersions("2.0", "2.0");
+        Assignment upgradeVersions = new Assignment("2.0", "2.0");
 
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment?state=stopped");
-        resource.upgrade(upgradeVersions, uriInfo, false);
+        resource.upgrade(new InstallationRequest(upgradeVersions, IdAndVersion.forIds(apple1SlotId, apple2SlotId, bananaSlotId)), uriInfo, false);
     }
 
     @Test
     public void testUpgradeDifferentBinaryVersion()
     {
         // upgrade apple slot 1 to binary version 2.0, but leave everything else unchanged
-        resource.upgrade(new UpgradeVersions("2.0", null), MockUriInfo.from("http://localhost/v1/slot/assignment?uuid=" + apple1SlotId), false);
+        resource.upgrade(new InstallationRequest(new Assignment("2.0", null), IdAndVersion.forIds(apple1SlotId)), MockUriInfo.from("http://localhost/v1/slot/assignment"), false);
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
         SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
         SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
@@ -193,9 +195,9 @@ public class TestCoordinatorAssignmentResource
         assertEquals(bananaStatus.getAssignment().getBinary(), BANANA_ASSIGNMENT.getBinary());
 
         // upgrade all apple slots to binary and config version2.0
-        UpgradeVersions upgradeVersions = new UpgradeVersions("2.0", "2.0");
-        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment?host=apple*");
-        Response response = resource.upgrade(upgradeVersions, uriInfo, false);
+        Assignment upgradeVersions = new Assignment("2.0", "2.0");
+        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
+        Response response = resource.upgrade(new InstallationRequest(upgradeVersions, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo, false);
 
         coordinator.getAgentByAgentId(agentId);
         agentStatus = coordinator.getAgentByAgentId(agentId);

@@ -6,4 +6,3 @@ public interface RemoteSlotJob
 {
     SlotJobStatus getJobStatus();
 }
-

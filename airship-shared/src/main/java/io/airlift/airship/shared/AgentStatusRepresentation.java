@@ -301,4 +301,29 @@ public class AgentStatusRepresentation
         sb.append('}');
         return sb.toString();
     }
+
+    public static Function<AgentStatusRepresentation, IdAndVersion> agentToIdWithVersion()
+    {
+        return new Function<AgentStatusRepresentation, IdAndVersion>()
+        {
+            @Override
+            public IdAndVersion apply(AgentStatusRepresentation input)
+            {
+                return new IdAndVersion(input.getAgentId(), input.getVersion());
+            }
+        };
+    }
+
+    public static Function<AgentStatusRepresentation, IdAndVersion> agentToIdWithoutVersion()
+    {
+        return new Function<AgentStatusRepresentation, IdAndVersion>()
+        {
+            @Override
+            public IdAndVersion apply(AgentStatusRepresentation input)
+            {
+                return new IdAndVersion(input.getAgentId(), null);
+            }
+        };
+    }
+
 }

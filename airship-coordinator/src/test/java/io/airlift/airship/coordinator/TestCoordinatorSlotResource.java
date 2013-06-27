@@ -3,9 +3,10 @@ package io.airlift.airship.coordinator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import io.airlift.airship.coordinator.job.InstallationRequest;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
-import io.airlift.airship.shared.AssignmentRepresentation;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
@@ -20,7 +21,9 @@ import org.testng.annotations.Test;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -187,13 +190,16 @@ public class TestCoordinatorSlotResource
 
     public void testInstall(int numberOfAgents, int limit, Assignment assignment)
     {
+        List<IdAndVersion> agentIds = new ArrayList<>();
         for (int i = 0; i < numberOfAgents; i++) {
-            provisioner.addAgent(UUID.randomUUID().toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 8, "memory", 1024));
+            UUID uuid = UUID.randomUUID();
+            agentIds.addAll(IdAndVersion.forIds(uuid));
+            provisioner.addAgent(uuid.toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 8, "memory", 1024));
         }
         coordinator.updateAllAgents();
 
-        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment?host=apple*");
-        Response response = resource.install(AssignmentRepresentation.from(assignment), limit, uriInfo);
+        UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
+        Response response = resource.install(new InstallationRequest(assignment, agentIds), limit, uriInfo);
 
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
@@ -211,11 +217,12 @@ public class TestCoordinatorSlotResource
     @Test
     public void testInstallWithinResourceLimit()
     {
-        provisioner.addAgent(UUID.randomUUID().toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 1, "memory", 512));
+        UUID agentId = UUID.randomUUID();
+        provisioner.addAgent(agentId.toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 1, "memory", 512));
         coordinator.updateAllAgents();
 
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
-        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo);
+        Response response = resource.install(new InstallationRequest(APPLE_ASSIGNMENT, IdAndVersion.forIds(agentId)), 1, uriInfo);
 
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
@@ -231,11 +238,12 @@ public class TestCoordinatorSlotResource
     @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "No agents have the available resources to run the specified binary and configuration.")
     public void testInstallNotEnoughResources()
     {
-        provisioner.addAgent(UUID.randomUUID().toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 0, "memory", 0));
+        UUID agentId = UUID.randomUUID();
+        provisioner.addAgent(agentId.toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 0, "memory", 0));
         coordinator.updateAllAgents();
 
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
-        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo);
+        Response response = resource.install(new InstallationRequest(APPLE_ASSIGNMENT, IdAndVersion.forIds(agentId)), 1, uriInfo);
 
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
 
@@ -245,20 +253,21 @@ public class TestCoordinatorSlotResource
     @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "No agents have the available resources to run the specified binary and configuration.")
     public void testInstallResourcesConsumed()
     {
-        provisioner.addAgent(UUID.randomUUID().toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 1, "memory", 512));
+        UUID agentId = UUID.randomUUID();
+        provisioner.addAgent(agentId.toString(), URI.create("fake://appleServer1/"), ImmutableMap.of("cpu", 1, "memory", 512));
         coordinator.updateAllAgents();
 
         UriInfo uriInfo = MockUriInfo.from("http://localhost/v1/slot/assignment");
 
         // install an apple server
-        Response response = resource.install(AssignmentRepresentation.from(APPLE_ASSIGNMENT), 1, uriInfo);
+        Response response = resource.install(new InstallationRequest(APPLE_ASSIGNMENT, IdAndVersion.forIds(agentId)), 1, uriInfo);
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         Collection<SlotStatusRepresentation> slots = (Collection<SlotStatusRepresentation>) response.getEntity();
         assertEquals(slots.size(), 1);
         assertAppleSlot(Iterables.get(slots, 0));
 
         // try to install a banana server which will fail
-        response = resource.install(AssignmentRepresentation.from(BANANA_ASSIGNMENT), 1, uriInfo);
+        response = resource.install(new InstallationRequest(BANANA_ASSIGNMENT, ImmutableList.<IdAndVersion>of()), 1, uriInfo);
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         response.getEntity();
     }

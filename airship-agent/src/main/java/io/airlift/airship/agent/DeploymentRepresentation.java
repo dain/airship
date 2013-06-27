@@ -17,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import io.airlift.airship.shared.AssignmentRepresentation;
+import io.airlift.airship.shared.Assignment;
 
 import java.io.File;
 import java.util.Map;
@@ -26,21 +26,21 @@ import java.util.UUID;
 public class DeploymentRepresentation
 {
     private final UUID nodeId;
-    private final AssignmentRepresentation assignment;
+    private final Assignment assignment;
     private final Map<String, Integer> resources;
 
     public static DeploymentRepresentation from(Deployment deployment)
     {
         return new DeploymentRepresentation(
                 deployment.getNodeId(),
-                AssignmentRepresentation.from(deployment.getAssignment()),
+                deployment.getAssignment(),
                 deployment.getResources());
     }
 
     @JsonCreator
     public DeploymentRepresentation(
             @JsonProperty("nodeId") UUID nodeId,
-            @JsonProperty("assignment") AssignmentRepresentation assignment,
+            @JsonProperty("assignment") Assignment assignment,
             @JsonProperty("resources") Map<String, Integer> resources)
     {
         Preconditions.checkNotNull(nodeId, "nodeId is null");
@@ -62,7 +62,7 @@ public class DeploymentRepresentation
     }
 
     @JsonProperty
-    public AssignmentRepresentation getAssignment()
+    public Assignment getAssignment()
     {
         return assignment;
     }
@@ -75,7 +75,7 @@ public class DeploymentRepresentation
 
     public Deployment toDeployment(File deploymentDir, File dataDir, String location)
     {
-        return new Deployment(nodeId, location, deploymentDir, dataDir, assignment.toAssignment(), resources);
+        return new Deployment(nodeId, location, deploymentDir, dataDir, assignment, resources);
     }
 
     @Override

@@ -3,20 +3,21 @@ package io.airlift.airship.cli;
 import com.google.common.base.Charsets;
 import com.google.common.base.Predicate;
 import com.google.common.io.Files;
-import io.airlift.discovery.client.ServiceDescriptor;
-import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
-import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.ServiceInventory;
+import io.airlift.airship.coordinator.Coordinator;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
-import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.UpgradeVersions;
+import io.airlift.discovery.client.ServiceDescriptor;
+import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
 import io.airlift.json.JsonCodec;
 
 import java.io.File;
@@ -27,15 +28,10 @@ import java.util.UUID;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.transform;
-import static io.airlift.airship.cli.CommanderResponse.createCommanderResponse;
 import static io.airlift.airship.shared.AgentStatus.idGetter;
 import static io.airlift.airship.shared.AgentStatusRepresentation.fromAgentStatus;
 import static io.airlift.airship.shared.CoordinatorStatusRepresentation.fromCoordinatorStatus;
-import static io.airlift.airship.shared.SlotStatus.uuidGetter;
 import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
-import static io.airlift.airship.shared.VersionsUtil.checkAgentsVersion;
-import static io.airlift.airship.shared.VersionsUtil.createAgentsVersion;
-import static io.airlift.airship.shared.VersionsUtil.createSlotsVersion;
 
 public class LocalCommander implements Commander
 {
@@ -57,7 +53,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public CommanderResponse<List<SlotStatusRepresentation>> show(SlotFilter slotFilter)
+    public List<SlotStatusRepresentation> show(SlotFilter slotFilter)
     {
         List<SlotStatus> allSlotStatus = coordinator.getAllSlotStatus();
         List<UUID> uuids = transform(allSlotStatus, SlotStatus.uuidGetter());
@@ -69,102 +65,73 @@ public class LocalCommander implements Commander
         // update just in case something changed
         updateServiceInventory();
 
-        return createCommanderResponse(createSlotsVersion(slots), transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository)));
+        return transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository));
     }
 
     @Override
-    public List<SlotStatusRepresentation> install(AgentFilter agentFilter, int count, Assignment assignment, String expectedAgentsVersion)
+    public JobStatus install(List<IdAndVersion> agents, int count, Assignment assignment)
     {
         // select the target agents
-        Predicate<AgentStatus> agentsPredicate = agentFilter.toAgentPredicate(
-                transform(coordinator.getAgents(), idGetter()),
-                transform(coordinator.getAllSlotStatus(), uuidGetter()),
-                true,
-                repository);
-        List<AgentStatus> agents = coordinator.getAgents(agentsPredicate);
-
-        // verify the expected status of agents
-        checkAgentsVersion(expectedAgentsVersion, agents);
-
         // install the software
-        List<SlotStatus> slots = coordinator.install(agentsPredicate, count, assignment);
+        JobStatus job = coordinator.install(agents, count, assignment);
 
         // update to latest state
         updateServiceInventory();
 
-        // calculate unique prefix size with the new slots included
-        return transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository));
+        return job;
     }
 
     @Override
-    public List<SlotStatusRepresentation> upgrade(SlotFilter slotFilter, UpgradeVersions upgradeVersions, String expectedSlotsVersion, boolean force)
+    public JobStatus upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force)
     {
-        // build predicate
-        List<UUID> uuids = transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter());
-        Predicate<SlotStatus> slotPredicate = slotFilter.toSlotPredicate(true, uuids);
-
         // upgrade slots
-        List<SlotStatus> slots = coordinator.upgrade(slotPredicate, upgradeVersions, expectedSlotsVersion, force);
+        JobStatus job = coordinator.upgrade(assignment, slots, force);
 
         // update to latest state
         updateServiceInventory();
 
-        // build results
-        return transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository));
+        return job;
     }
 
     @Override
-    public List<SlotStatusRepresentation> setState(SlotFilter slotFilter, SlotLifecycleState state, String expectedSlotsVersion)
+    public JobStatus setState(List<IdAndVersion> slots, SlotLifecycleAction state)
     {
-        // build predicate
-        List<UUID> uuids = transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter());
-        Predicate<SlotStatus> slotPredicate = slotFilter.toSlotPredicate(true, uuids);
-
         // before changing state (like starting) update just in case something changed
         updateServiceInventory();
 
         // set slots state
-        List<SlotStatus> slots = coordinator.setState(state, slotPredicate, expectedSlotsVersion);
+        JobStatus job = coordinator.doLifecycle(slots, state);
 
         // update to latest state
         updateServiceInventory();
 
-        // build results
-        return transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository));
+        return job;
     }
 
     @Override
-    public List<SlotStatusRepresentation> terminate(SlotFilter slotFilter, String expectedSlotsVersion)
+    public JobStatus terminate(List<IdAndVersion> slots)
     {
-        // build predicate
-        List<UUID> uuids = transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter());
-        Predicate<SlotStatus> slotPredicate = slotFilter.toSlotPredicate(true, uuids);
-
         // terminate slots
-        List<SlotStatus> slots = coordinator.terminate(slotPredicate, expectedSlotsVersion);
+        JobStatus job = coordinator.terminate(slots);
 
         // update to latest state
         updateServiceInventory();
 
         // build results
-        return transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository));
+        return job;
     }
 
     @Override
-    public List<SlotStatusRepresentation> resetExpectedState(SlotFilter slotFilter, String expectedSlotsVersion)
+    public JobStatus resetExpectedState(List<IdAndVersion> slots)
     {
-        // build predicate
-        List<UUID> uuids = transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter());
-        Predicate<SlotStatus> slotPredicate = slotFilter.toSlotPredicate(true, uuids);
-
         // rest slots expected state
-        List<SlotStatus> slots = coordinator.resetExpectedState(slotPredicate, expectedSlotsVersion);
+        JobStatus job = coordinator.resetExpectedState(slots);
 
         // update just in case something changed
         updateServiceInventory();
 
-        // build results
-        return transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository));
+
+        return job;
     }
 
     @Override
@@ -203,7 +170,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public List<CoordinatorStatusRepresentation> provisionCoordinators(String coordinatorConfigSpec,
+    public JobStatus provisionCoordinators(String coordinatorConfigSpec,
             int coordinatorCount,
             String instanceType,
             String availabilityZone,
@@ -222,7 +189,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public CommanderResponse<List<AgentStatusRepresentation>> showAgents(AgentFilter agentFilter)
+    public List<AgentStatusRepresentation> showAgents(AgentFilter agentFilter)
     {
         Predicate<AgentStatus> agentPredicate = agentFilter.toAgentPredicate(
                 transform(coordinator.getAgents(), idGetter()),
@@ -233,11 +200,11 @@ public class LocalCommander implements Commander
 
         // update just in case something changed
         updateServiceInventory();
-        return createCommanderResponse(createAgentsVersion(agentStatuses), transform(agentStatuses, fromAgentStatus(coordinator.getAgents(), repository)));
+        return transform(agentStatuses, fromAgentStatus(coordinator.getAgents(), repository));
     }
 
     @Override
-    public List<AgentStatusRepresentation> provisionAgents(String agentConfig,
+    public JobStatus provisionAgents(String agentConfig,
             int agentCount,
             String instanceType,
             String availabilityZone,
@@ -250,7 +217,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public AgentStatusRepresentation terminateAgent(String agentId)
+    public JobStatus terminateAgent(String agentId)
     {
         throw new UnsupportedOperationException("Agents can not be terminated in local mode");
     }

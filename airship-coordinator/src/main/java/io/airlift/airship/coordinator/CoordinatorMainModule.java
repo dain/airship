@@ -20,6 +20,9 @@ import com.google.inject.multibindings.Multibinder;
 import io.airlift.airship.coordinator.auth.AuthConfig;
 import io.airlift.airship.coordinator.auth.AuthFilter;
 import io.airlift.airship.coordinator.auth.SignatureVerifier;
+import io.airlift.airship.coordinator.job.InstallationRequest;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.LifecycleRequest;
 import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.ExpectedSlotStatus;
@@ -83,6 +86,10 @@ public class CoordinatorMainModule
         JsonCodecBinder.jsonCodecBinder(binder).bindListJsonCodec(ServiceDescriptor.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(SlotJob.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(SlotJobStatus.class);
+
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(JobStatus.class);
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(LifecycleRequest.class);
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(InstallationRequest.class);
 
         bindConfig(binder).to(CoordinatorConfig.class);
 

@@ -14,12 +14,9 @@
 package io.airlift.airship.coordinator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Lists;
 import com.google.inject.Inject;
-import io.airlift.airship.shared.Repository;
-import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.UpgradeVersions;
+import io.airlift.airship.coordinator.job.InstallationRequest;
+import io.airlift.airship.coordinator.job.JobStatus;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.HeaderParam;
@@ -31,47 +28,38 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
-import java.util.List;
-import java.util.UUID;
-
-import static com.google.common.collect.Collections2.transform;
-import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
+import static io.airlift.airship.coordinator.job.JobInfoUtil.makeJobStatusResponse;
 import static io.airlift.airship.shared.AirshipHeaders.AIRSHIP_FORCE_HEADER;
 
 @Path("/v1/slot/assignment")
 public class CoordinatorAssignmentResource
 {
     private final Coordinator coordinator;
-    private final Repository repository;
 
     @Inject
-    public CoordinatorAssignmentResource(Coordinator coordinator, Repository repository)
+    public CoordinatorAssignmentResource(Coordinator coordinator)
     {
         Preconditions.checkNotNull(coordinator, "coordinator must not be null");
-        Preconditions.checkNotNull(repository, "repository is null");
-
         this.coordinator = coordinator;
-        this.repository = repository;
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response upgrade(UpgradeVersions upgradeVersions,
+    public Response upgrade(InstallationRequest request,
             @Context UriInfo uriInfo,
             @HeaderParam(AIRSHIP_FORCE_HEADER) boolean force)
     {
-        Preconditions.checkNotNull(upgradeVersions, "upgradeRepresentation must not be null");
+        Preconditions.checkNotNull(request, "request must not be null");
 
-        // build filter
-        List<UUID> uuids = Lists.transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter());
-        Predicate<SlotStatus> slotFilter = SlotFilterBuilder.build(uriInfo, true, uuids);
+        if (request.getIdsAndVersions().isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("No slots selected")
+                    .build();
+        }
 
-        // upgrade slots
-        List<SlotStatus> results = coordinator.upgrade(slotFilter, upgradeVersions, null, force);
+        JobStatus jobStatus = coordinator.upgrade(request.getAssignment(), request.getIdsAndVersions(), force);
 
-        // build response
-        return Response.ok(transform(results, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
-                .build();
+        return makeJobStatusResponse(Response.Status.CREATED, uriInfo, jobStatus);
     }
 }

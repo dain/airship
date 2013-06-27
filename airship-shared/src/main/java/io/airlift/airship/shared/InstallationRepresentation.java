@@ -24,7 +24,7 @@ import java.util.Map;
 public class InstallationRepresentation
 {
     private final String shortName;
-    private final AssignmentRepresentation assignment;
+    private final Assignment assignment;
     private final String binaryFile;
     private final String configFile;
     private final Map<String, Integer> resources;
@@ -34,7 +34,7 @@ public class InstallationRepresentation
         Assignment assignment = installation.getAssignment();
         return new InstallationRepresentation(
                 installation.getShortName(),
-                AssignmentRepresentation.from(assignment),
+                assignment,
                 installation.getBinaryFile().toString(),
                 installation.getConfigFile().toString(),
                 installation.getResources());
@@ -43,7 +43,7 @@ public class InstallationRepresentation
     @JsonCreator
     public InstallationRepresentation(
             @JsonProperty("shortName") String shortName,
-            @JsonProperty("assignment") AssignmentRepresentation assignmentRepresentation,
+            @JsonProperty("assignment") Assignment assignmentRepresentation,
             @JsonProperty("binaryFile") String binaryFile,
             @JsonProperty("configFile") String configFile,
             @JsonProperty("resources") Map<String, Integer> resources)
@@ -64,7 +64,7 @@ public class InstallationRepresentation
 
     @JsonProperty
     @NotNull(message = "is missing")
-    public AssignmentRepresentation getAssignment()
+    public Assignment getAssignment()
     {
         return assignment;
     }
@@ -91,7 +91,7 @@ public class InstallationRepresentation
 
     public Installation toInstallation()
     {
-        Installation installation = new Installation(shortName, assignment.toAssignment(), URI.create(binaryFile), URI.create(configFile), resources);
+        Installation installation = new Installation(shortName, assignment, URI.create(binaryFile), URI.create(configFile), resources);
         return installation;
     }
 

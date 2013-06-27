@@ -30,13 +30,15 @@ import io.airlift.airship.coordinator.CoordinatorConfig;
 import io.airlift.airship.coordinator.HttpRepository;
 import io.airlift.airship.coordinator.Instance;
 import io.airlift.airship.coordinator.MavenRepository;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.UpgradeVersions;
 import io.airlift.command.Arguments;
 import io.airlift.command.Cli;
 import io.airlift.command.Cli.CliBuilder;
@@ -54,7 +56,6 @@ import io.airlift.log.LoggingMBean;
 import io.airlift.node.NodeInfo;
 
 import javax.inject.Inject;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -72,12 +73,12 @@ import static com.google.common.base.Objects.firstNonNull;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.io.ByteStreams.nullOutputStream;
 import static io.airlift.airship.coordinator.AwsProvisioner.toInstance;
+import static io.airlift.airship.shared.AgentStatusRepresentation.agentToIdWithVersion;
+import static io.airlift.airship.shared.AgentStatusRepresentation.agentToIdWithoutVersion;
 import static io.airlift.airship.shared.ConfigUtils.createConfigurationFactory;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilder;
-import static io.airlift.airship.shared.SlotLifecycleState.KILLING;
-import static io.airlift.airship.shared.SlotLifecycleState.RESTARTING;
-import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
-import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
+import static io.airlift.airship.shared.SlotStatusRepresentation.slotToIdWithVersion;
+import static io.airlift.airship.shared.SlotStatusRepresentation.slotToIdWithoutVersion;
 import static java.lang.Boolean.parseBoolean;
 import static java.lang.String.format;
 import static java.util.UUID.randomUUID;
@@ -298,15 +299,16 @@ public class Airship
         {
             Preconditions.checkArgument(slotFilter.isFiltered(), "A filter is required");
 
+            // show affected slots
+            List<SlotStatusRepresentation> response = commander.show(slotFilter);
+
             if (globalOptions.batch) {
-                slotExecution.execute(commander, slotFilter, null);
+                slotExecution.execute(commander, Lists.transform(response, slotToIdWithoutVersion()));
                 return;
             }
 
-            // show effected slots
-            CommanderResponse<List<SlotStatusRepresentation>> response = commander.show(slotFilter);
-            displaySlots(response.getValue());
-            if (response.getValue().isEmpty()) {
+            displaySlots(response);
+            if (response.isEmpty()) {
                 return;
             }
             System.out.println();
@@ -316,12 +318,7 @@ public class Airship
                 return;
             }
 
-            // return filter for only the shown slots
-            SlotFilter uuidFilter = new SlotFilter();
-            for (SlotStatusRepresentation slot : response.getValue()) {
-                uuidFilter.uuid.add(slot.getId().toString());
-            }
-            slotExecution.execute(commander, uuidFilter, response.getVersion());
+            slotExecution.execute(commander, Lists.transform(response, slotToIdWithVersion()));
         }
 
         public void displaySlots(Iterable<SlotStatusRepresentation> slots)
@@ -340,7 +337,7 @@ public class Airship
         }
 
         protected interface SlotExecution {
-            void execute(Commander commander, SlotFilter slotFilter, String expectedVersion);
+            void execute(Commander commander, List<IdAndVersion> slots);
         }
 
     }
@@ -378,8 +375,8 @@ public class Airship
         @Override
         public void execute(Commander commander)
         {
-            CommanderResponse<List<SlotStatusRepresentation>> response = commander.show(slotFilter);
-            displaySlots(response.getValue());
+            List<SlotStatusRepresentation> response = commander.show(slotFilter);
+            displaySlots(response);
         }
 
         @Override
@@ -433,15 +430,8 @@ public class Airship
             // add assignment to agent filter
             agentFilter.assignableFilters.add(assignment);
 
-            if (globalOptions.batch) {
-                List<SlotStatusRepresentation> slots = commander.install(agentFilter, count, assignment, null);
-                displaySlots(slots);
-                return;
-            }
-
             // select agents
-            CommanderResponse<List<AgentStatusRepresentation>> response = commander.showAgents(agentFilter);
-            List<AgentStatusRepresentation> agents = response.getValue();
+            List<AgentStatusRepresentation> agents = commander.showAgents(agentFilter);
             if (agents.isEmpty()) {
                 System.out.println("No agents match the provided filters, matched the software constrains or had the required resources available for the software");
                 return;
@@ -452,6 +442,12 @@ public class Airship
                 agents = newArrayList(agents);
                 Collections.shuffle(agents);
                 agents = agents.subList(0, count);
+            }
+
+            if (globalOptions.batch) {
+                JobStatus job = commander.install(Lists.transform(agents, agentToIdWithoutVersion()), count, assignment);
+                // todo: display progress
+                return;
             }
 
             // show effected agents
@@ -470,8 +466,8 @@ public class Airship
             }
 
             // install software
-            List<SlotStatusRepresentation> slots = commander.install(uuidFilter, count, assignment, response.getVersion());
-            displaySlots(slots);
+            JobStatus slots = commander.install(Lists.transform(agents, agentToIdWithVersion()), count, assignment);
+            // todo: display progress
         }
 
         @Override
@@ -523,14 +519,13 @@ public class Airship
                 }
             }
 
-            final UpgradeVersions upgradeVersions = new UpgradeVersions(binaryVersion, configVersion);
+            final Assignment upgradeVersions = new Assignment(binaryVersion, configVersion);
 
             verifySlotExecution(commander, slotFilter, "Are you sure you would like to UPGRADE these servers?", false, new SlotExecution()
             {
-                public void execute(Commander commander, SlotFilter slotFilter, String expectedVersion)
+                public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    List<SlotStatusRepresentation> slots = commander.upgrade(slotFilter, upgradeVersions, expectedVersion, force);
-                    displaySlots(slots);
+                    commander.upgrade(slots, upgradeVersions, force);
                 }
             });
         }
@@ -559,10 +554,10 @@ public class Airship
         {
             verifySlotExecution(commander, slotFilter, "Are you sure you would like to TERMINATE these servers?", false, new SlotExecution()
             {
-                public void execute(Commander commander, SlotFilter slotFilter, String expectedVersion)
+                public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    List<SlotStatusRepresentation> slots = commander.terminate(slotFilter, expectedVersion);
-                    displaySlots(slots);
+                    JobStatus job = commander.terminate(slots);
+                    // todo: display progress
                 }
             });
         }
@@ -590,10 +585,10 @@ public class Airship
         {
             verifySlotExecution(commander, slotFilter, "Are you sure you would like to START these servers?", true, new SlotExecution()
             {
-                public void execute(Commander commander, SlotFilter slotFilter, String expectedVersion)
+                public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    List<SlotStatusRepresentation> slots = commander.setState(slotFilter, RUNNING, expectedVersion);
-                    displaySlots(slots);
+                    JobStatus job = commander.setState(slots, SlotLifecycleAction.START);
+                    // todo: display progress
                 }
             });
         }
@@ -610,10 +605,10 @@ public class Airship
         {
             verifySlotExecution(commander, slotFilter, "Are you sure you would like to STOP these servers?", true, new SlotExecution()
             {
-                public void execute(Commander commander, SlotFilter slotFilter, String expectedVersion)
+                public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    List<SlotStatusRepresentation> slots = commander.setState(slotFilter, STOPPED, expectedVersion);
-                    displaySlots(slots);
+                    JobStatus job = commander.setState(slots, SlotLifecycleAction.STOP);
+                    // todo: display progress
                 }
             });
         }
@@ -630,10 +625,10 @@ public class Airship
         {
             verifySlotExecution(commander, slotFilter, "Are you sure you would like to KILL these servers?", true, new SlotExecution()
             {
-                public void execute(Commander commander, SlotFilter slotFilter, String expectedVersion)
+                public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    List<SlotStatusRepresentation> slots = commander.setState(slotFilter, KILLING, expectedVersion);
-                    displaySlots(slots);
+                    JobStatus job = commander.setState(slots, SlotLifecycleAction.KILL);
+                    // todo: display progress
                 }
             });
         }
@@ -650,10 +645,10 @@ public class Airship
         {
             verifySlotExecution(commander, slotFilter, "Are you sure you would like to RESTART these servers?", true, new SlotExecution()
             {
-                public void execute(Commander commander, SlotFilter slotFilter, String expectedVersion)
+                public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    List<SlotStatusRepresentation> slots = commander.setState(slotFilter, RESTARTING, expectedVersion);
-                    displaySlots(slots);
+                    JobStatus job = commander.setState(slots, SlotLifecycleAction.RESTART);
+                    // todo: display progress
                 }
             });
         }
@@ -670,10 +665,10 @@ public class Airship
         {
             verifySlotExecution(commander, slotFilter, "Are you sure you would like to reset these servers to their actual state?", true, new SlotExecution()
             {
-                public void execute(Commander commander, SlotFilter slotFilter, String expectedVersion)
+                public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    List<SlotStatusRepresentation> slots = commander.resetExpectedState(slotFilter, expectedVersion);
-                    displaySlots(slots);
+                    JobStatus job = commander.resetExpectedState(slots);
+                    // todo: display progress
                 }
             });
         }
@@ -764,7 +759,7 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            List<CoordinatorStatusRepresentation> coordinators = commander.provisionCoordinators(coordinatorConfig,
+            JobStatus job = commander.provisionCoordinators(coordinatorConfig,
                     count,
                     instanceType,
                     availabilityZone,
@@ -773,17 +768,20 @@ public class Airship
                     securityGroup,
                     !noWait);
 
-            // add the new coordinators to the config
-            String coordinatorProperty = "environment." + environmentRef + ".coordinator";
-            for (CoordinatorStatusRepresentation coordinator : coordinators) {
-                URI uri = coordinator.getExternalUri();
-                if (uri != null) {
-                    config.add(coordinatorProperty, uri.toASCIIString());
-                }
-            }
-            config.save();
+            // todo: display progress and wait for coordinators to be provisioned
+            throw new UnsupportedOperationException("not yet implemented");
 
-            displayCoordinators(coordinators);
+//            // add the new coordinators to the config
+//            String coordinatorProperty = "environment." + environmentRef + ".coordinator";
+//            for (CoordinatorStatusRepresentation coordinator : coordinators) {
+//                URI uri = coordinator.getExternalUri();
+//                if (uri != null) {
+//                    config.add(coordinatorProperty, uri.toASCIIString());
+//                }
+//            }
+//            config.save();
+//
+//            displayCoordinators(coordinators);
         }
 
         @Override
@@ -840,8 +838,8 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            CommanderResponse<List<AgentStatusRepresentation>> response = commander.showAgents(agentFilter);
-            displayAgents(response.getValue());
+            List<AgentStatusRepresentation> response = commander.showAgents(agentFilter);
+            displayAgents(response);
         }
 
         @Override
@@ -887,8 +885,10 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            List<AgentStatusRepresentation> agents = commander.provisionAgents(agentConfig, count, instanceType, availabilityZone, ami, keyPair, securityGroup, !noWait);
-            displayAgents(agents);
+            JobStatus agents = commander.provisionAgents(agentConfig, count, instanceType, availabilityZone, ami, keyPair, securityGroup, !noWait);
+
+            // todo: show progress and display results
+            // displayAgents(agents);
         }
 
         @Override
@@ -919,8 +919,9 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            AgentStatusRepresentation agent = commander.terminateAgent(agentId);
-            displayAgents(ImmutableList.of(agent));
+            JobStatus agent = commander.terminateAgent(agentId);
+            // todo: show progress and display result
+            // displayAgents(ImmutableList.of(agent));
         }
 
         @Override

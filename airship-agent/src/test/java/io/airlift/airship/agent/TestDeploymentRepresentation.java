@@ -17,7 +17,6 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import io.airlift.json.JsonCodec;
-import io.airlift.airship.shared.AssignmentRepresentation;
 import org.testng.annotations.Test;
 
 import java.util.UUID;
@@ -32,7 +31,7 @@ public class TestDeploymentRepresentation
 
     private final DeploymentRepresentation expected = new DeploymentRepresentation(
             UUID.fromString("12345678-1234-1234-1234-123456789012"),
-            AssignmentRepresentation.from(APPLE_ASSIGNMENT),
+            APPLE_ASSIGNMENT,
             ImmutableMap.<String, Integer>of("memory", 512));
 
     @Test

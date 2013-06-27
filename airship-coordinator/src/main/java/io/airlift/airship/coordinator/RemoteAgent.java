@@ -3,6 +3,7 @@ package io.airlift.airship.coordinator;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.discovery.client.ServiceDescriptor;
 
 import java.net.URI;
@@ -23,4 +24,7 @@ public interface RemoteAgent
     List<? extends RemoteSlot> getSlots();
 
     void setServiceInventory(List<ServiceDescriptor> serviceInventory);
+
+    RemoteSlotJob createSlotJob(SlotJob slotJob);
+
 }
