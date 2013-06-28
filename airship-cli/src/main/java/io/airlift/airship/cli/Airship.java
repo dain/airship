@@ -587,7 +587,7 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.setState(slots, SlotLifecycleAction.START);
+                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.START);
                     // todo: display progress
                 }
             });
@@ -607,7 +607,7 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.setState(slots, SlotLifecycleAction.STOP);
+                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.STOP);
                     // todo: display progress
                 }
             });
@@ -627,7 +627,7 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.setState(slots, SlotLifecycleAction.KILL);
+                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.KILL);
                     // todo: display progress
                 }
             });
@@ -647,7 +647,7 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.setState(slots, SlotLifecycleAction.RESTART);
+                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.RESTART);
                     // todo: display progress
                 }
             });

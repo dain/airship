@@ -18,7 +18,7 @@ public interface Commander
 
     JobStatus upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force);
 
-    JobStatus setState(List<IdAndVersion> slots, SlotLifecycleAction state);
+    JobStatus doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction state);
 
     JobStatus terminate(List<IdAndVersion> slots);
 

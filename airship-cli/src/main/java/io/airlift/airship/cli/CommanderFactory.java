@@ -243,8 +243,8 @@ public class CommanderFactory
                 provisioner,
                 stateManager,
                 serviceInventory,
-                new Duration(100, TimeUnit.DAYS),
-                allowDuplicateInstallations);
+                new Duration(100, TimeUnit.DAYS)
+        );
 
         return new LocalCommander(environment, new File(slotsDir), coordinator, repository, serviceInventory);
     }

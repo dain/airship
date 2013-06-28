@@ -58,8 +58,8 @@ public class TestAdminResource
                 provisioner,
                 new InMemoryStateManager(),
                 new MockServiceInventory(),
-                new Duration(1, TimeUnit.DAYS),
-                false);
+                new Duration(1, TimeUnit.DAYS)
+        );
         resource = new AdminResource(coordinator, repository);
     }
 

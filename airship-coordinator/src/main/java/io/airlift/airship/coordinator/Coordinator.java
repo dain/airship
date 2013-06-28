@@ -10,7 +10,6 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
@@ -48,26 +47,20 @@ import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.Duration;
 
-import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -101,8 +94,6 @@ public class Coordinator
     private final RemoteAgentFactory remoteAgentFactory;
     private final ServiceInventory serviceInventory;
     private final StateManager stateManager;
-    private final boolean allowDuplicateInstallationsOnAnAgent;
-    private final ExecutorService executor;
 
 
     private final AtomicLong nextJobId = new AtomicLong();
@@ -134,8 +125,8 @@ public class Coordinator
                 provisioner,
                 stateManager,
                 serviceInventory,
-                checkNotNull(config, "config is null").getStatusExpiration(),
-                config.isAllowDuplicateInstallationsOnAnAgent());
+                checkNotNull(config, "config is null").getStatusExpiration()
+        );
     }
 
     public Coordinator(CoordinatorStatus coordinatorStatus,
@@ -145,8 +136,7 @@ public class Coordinator
             Provisioner provisioner,
             StateManager stateManager,
             ServiceInventory serviceInventory,
-            Duration statusExpiration,
-            boolean allowDuplicateInstallationsOnAnAgent)
+            Duration statusExpiration)
     {
         Preconditions.checkNotNull(coordinatorStatus, "coordinatorStatus is null");
         Preconditions.checkNotNull(remoteCoordinatorFactory, "remoteCoordinatorFactory is null");
@@ -165,9 +155,6 @@ public class Coordinator
         this.stateManager = stateManager;
         this.serviceInventory = serviceInventory;
         this.statusExpiration = statusExpiration;
-        this.allowDuplicateInstallationsOnAnAgent = allowDuplicateInstallationsOnAnAgent;
-
-        this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("coordinator-task").build());
 
         timerService = Executors.newScheduledThreadPool(10, new ThreadFactoryBuilder().setNameFormat("coordinator-agent-monitor").setDaemon(true).build());
 
@@ -517,45 +504,6 @@ public class Coordinator
         return job.getStatus();
     }
 
-    private List<RemoteAgent> selectAgents(Predicate<AgentStatus> filter, Installation installation)
-    {
-        // select only online agents
-        filter = Predicates.and(filter, new AgentFilterBuilder.StatePredicate(AgentLifecycleState.ONLINE));
-        List<RemoteAgent> allAgents = newArrayList(filter(this.agents.values(), filterAgentsBy(filter)));
-        if (allAgents.isEmpty()) {
-            throw new IllegalStateException("No online agents match the provided filters.");
-        }
-        if (!allowDuplicateInstallationsOnAnAgent) {
-            allAgents = newArrayList(filter(allAgents, filterAgentsWithAssignment(installation)));
-            if (allAgents.isEmpty()) {
-                throw new IllegalStateException("All agents already have the specified binary and configuration installed.");
-            }
-        }
-
-        // randomize agents so all processes don't end up on the same node
-        // todo sort agents by number of process already installed on them?
-        Collections.shuffle(allAgents);
-
-        List<RemoteAgent> targetAgents = newArrayList();
-        for (RemoteAgent agent : allAgents) {
-            // agents without declared resources are considered to have unlimited resources
-            AgentStatus status = agent.status();
-            if (!status.getResources().isEmpty()) {
-                // verify that required resources are available
-                Map<String, Integer> availableResources = InstallationUtils.getAvailableResources(status);
-                if (!InstallationUtils.resourcesAreAvailable(availableResources, installation.getResources())) {
-                    continue;
-                }
-            }
-
-            targetAgents.add(agent);
-        }
-        if (targetAgents.isEmpty()) {
-            throw new IllegalStateException("No agents have the available resources to run the specified binary and configuration.");
-        }
-        return targetAgents;
-    }
-
     public JobStatus terminate(List<IdAndVersion> slots)
     {
         // 1. todo: update expected state
@@ -577,27 +525,28 @@ public class Coordinator
         return createJob(slotJobs);
     }
 
-    public JobStatus resetExpectedState(List<IdAndVersion> slots)
+    public JobStatus resetExpectedState(List<IdAndVersion> selectedSlots)
     {
-        throw new UnsupportedOperationException("not yet implemented");
-        //
-        //        // filter the slots
-        //        List<SlotStatus> filteredSlots = getAllSlotsStatus(filter);
-        //
-        //        return ImmutableList.copyOf(transform(filteredSlots, new Function<SlotStatus, SlotStatus>()
-        //        {
-        //            @Override
-        //            public SlotStatus apply(SlotStatus slotStatus)
-        //            {
-        //                if (slotStatus.getState() != SlotLifecycleState.UNKNOWN) {
-        //                    stateManager.setExpectedState(new ExpectedSlotStatus(slotStatus.getId(), slotStatus.getState(), slotStatus.getAssignment()));
-        //                }
-        //                else {
-        //                    stateManager.deleteExpectedState(slotStatus.getId());
-        //                }
-        //                return slotStatus;
-        //            }
-        //        }));
+        Set<UUID> slotIds = Stream.on(selectedSlots)
+                .transform(idGetter())
+                .transform(stringToUuidFunction())
+                .set();
+
+        List<SlotStatus> slots = getAllSlotsStatus(compose(in(slotIds), SlotStatus.uuidGetter()));
+        Map<String, SlotStatus> byId = Maps.uniqueIndex(slots, SlotStatus.idGetter());
+
+        for (IdAndVersion slot : selectedSlots) {
+            SlotStatus currentStatus = byId.get(slot.getId());
+
+            if (currentStatus.getState() != SlotLifecycleState.UNKNOWN) {
+                stateManager.setExpectedState(new ExpectedSlotStatus(currentStatus.getId(), currentStatus.getState(), currentStatus.getAssignment()));
+            }
+            else {
+                stateManager.deleteExpectedState(currentStatus.getId());
+            }
+        }
+
+        return createJob(ImmutableList.<RemoteSlotJob>of()); // todo
     }
 
     public List<SlotStatus> getAllSlotsStatus()
@@ -818,77 +767,6 @@ public class Coordinator
         };
     }
 
-    private Predicate<RemoteAgent> filterAgentsWithAssignment(final Installation installation)
-    {
-        Preconditions.checkNotNull(installation, "installation is null");
-        final Assignment assignment = installation.getAssignment();
-
-        return new Predicate<RemoteAgent>()
-        {
-            @Override
-            public boolean apply(RemoteAgent agent)
-            {
-                for (RemoteSlot slot : agent.getSlots()) {
-                    if (repository.binaryEqualsIgnoreVersion(assignment.getBinary(), slot.status().getAssignment().getBinary()) &&
-                            repository.configEqualsIgnoreVersion(assignment.getConfig(), slot.status().getAssignment().getConfig())) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-        };
-    }
-
-    private <F, T> ImmutableList<T> parallel(Iterable<F> items, final Function<F, T> function)
-    {
-        List<Callable<T>> callables = ImmutableList.copyOf(transform(items, new Function<F, Callable<T>>()
-        {
-            public Callable<T> apply(@Nullable final F item)
-            {
-                return new CallableFunction<>(item, function);
-            }
-        }));
-
-        List<Future<T>> futures;
-        try {
-            futures = executor.invokeAll(callables);
-        }
-        catch (InterruptedException e) {
-            throw new RuntimeException("Interrupted while waiting for command to finish", e);
-        }
-
-        List<Throwable> failures = new ArrayList<>();
-        ImmutableList.Builder<T> results = ImmutableList.builder();
-        for (Future<T> future : futures) {
-            try {
-                results.add(future.get());
-            }
-            catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                failures.add(e);
-            }
-            catch (CancellationException e) {
-                failures.add(e);
-            }
-            catch (ExecutionException e) {
-                if (e.getCause() != null) {
-                    failures.add(e.getCause());
-                } else {
-                    failures.add(e);
-                }
-            }
-        }
-        if (!failures.isEmpty()) {
-            Throwable first = failures.get(0);
-            RuntimeException runtimeException = new RuntimeException(first.getMessage());
-            for (Throwable failure : failures) {
-                runtimeException.addSuppressed(failure);
-            }
-            throw runtimeException;
-        }
-        return results.build();
-    }
-
     private static void waitForFutures(Iterable<ListenableFuture<?>> futures)
     {
         try {
@@ -977,27 +855,4 @@ public class Coordinator
             }
         };
     }
-
-
-
-    private static class CallableFunction<F, T>
-            implements Callable<T>
-    {
-        private final F item;
-        private final Function<F, T> function;
-
-        private CallableFunction(F item, Function<F, T> function)
-        {
-            this.item = item;
-            this.function = function;
-        }
-
-        @Override
-        public T call()
-        {
-            return function.apply(item);
-        }
-
-    }
-
 }

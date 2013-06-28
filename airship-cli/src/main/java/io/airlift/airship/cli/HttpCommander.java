@@ -108,7 +108,7 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public JobStatus setState(List<IdAndVersion> slots, SlotLifecycleAction action)
+    public JobStatus doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction action)
     {
         // todo
         throw new UnsupportedOperationException("not yet implemented");

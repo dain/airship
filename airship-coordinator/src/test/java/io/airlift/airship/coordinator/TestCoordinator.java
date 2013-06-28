@@ -2,7 +2,6 @@ package io.airlift.airship.coordinator;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
@@ -23,7 +22,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
-import static io.airlift.airship.shared.AssignmentHelper.BANANA_ASSIGNMENT;
 import static io.airlift.airship.shared.AssignmentHelper.RESOLVED_APPLE_ASSIGNMENT;
 import static io.airlift.airship.shared.AssignmentHelper.SHORT_APPLE_ASSIGNMENT;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
@@ -61,8 +59,8 @@ public class TestCoordinator
                 provisioner,
                 new InMemoryStateManager(),
                 new MockServiceInventory(),
-                new Duration(1, TimeUnit.DAYS),
-                false);
+                new Duration(1, TimeUnit.DAYS)
+        );
     }
 
     @AfterMethod

@@ -94,7 +94,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public JobStatus setState(List<IdAndVersion> slots, SlotLifecycleAction state)
+    public JobStatus doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction state)
     {
         // before changing state (like starting) update just in case something changed
         updateServiceInventory();
