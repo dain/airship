@@ -18,6 +18,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.io.Files;
 import com.google.inject.Binder;
 import com.google.inject.Guice;
@@ -27,6 +28,7 @@ import com.google.inject.util.Modules;
 import io.airlift.airship.agent.Agent;
 import io.airlift.airship.agent.Slot;
 import io.airlift.airship.coordinator.AgentProvisioningRepresentation;
+import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.CoordinatorMainModule;
 import io.airlift.airship.coordinator.CoordinatorProvisioningRepresentation;
 import io.airlift.airship.coordinator.HttpRemoteAgent;
@@ -38,7 +40,10 @@ import io.airlift.airship.coordinator.Provisioner;
 import io.airlift.airship.coordinator.StateManager;
 import io.airlift.airship.coordinator.StaticProvisionerModule;
 import io.airlift.airship.coordinator.TestingMavenRepository;
-import io.airlift.airship.coordinator.Coordinator;
+import io.airlift.airship.coordinator.job.InstallationRequest;
+import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.LifecycleRequest;
+import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.integration.MockLocalProvisioner.AgentServer;
 import io.airlift.airship.integration.MockLocalProvisioner.CoordinatorServer;
 import io.airlift.airship.shared.AgentLifecycleState;
@@ -48,6 +53,7 @@ import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.HttpUriBuilder;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotLifecycleState;
@@ -79,13 +85,11 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import javax.ws.rs.core.Response.Status;
-
 import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static com.google.inject.Scopes.SINGLETON;
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
@@ -95,13 +99,15 @@ import static io.airlift.airship.shared.FileUtils.createTempDir;
 import static io.airlift.airship.shared.FileUtils.deleteRecursively;
 import static io.airlift.airship.shared.FileUtils.newFile;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
+import static io.airlift.airship.shared.IdAndVersion.forIds;
 import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
+import static io.airlift.airship.shared.job.SlotJobStatus.isDonePredicate;
+import static io.airlift.airship.shared.job.SlotJobStatus.succeededPredicate;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
-import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.airlift.json.JsonCodec.listJsonCodec;
 import static io.airlift.testing.Assertions.assertNotEquals;
@@ -129,7 +135,11 @@ public class TestServerIntegration
     private final JsonCodec<List<SlotStatusRepresentation>> slotStatusesCodec = listJsonCodec(SlotStatusRepresentation.class);
     private final JsonCodec<CoordinatorProvisioningRepresentation> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRepresentation.class);
     private final JsonCodec<AgentProvisioningRepresentation> agentProvisioningCodec = jsonCodec(AgentProvisioningRepresentation.class);
-    private final JsonCodec<Assignment> assignmentCodec = jsonCodec(Assignment.class);
+
+    private final JsonCodec<LifecycleRequest> lifecycleRequestCodec = jsonCodec(LifecycleRequest.class);
+    private final JsonCodec<InstallationRequest> installationRequestCodec = jsonCodec(InstallationRequest.class);
+    private final JsonCodec<JobStatus> jobStatusCodec = jsonCodec(JobStatus.class);
+    private final JsonCodec<List<IdAndVersion>> idAndVersionsCodec = listJsonCodec(IdAndVersion.class);
 
     private File binaryRepoDir;
     private File localBinaryRepoDir;
@@ -497,20 +507,20 @@ public class TestServerIntegration
         Agent agent = initializeOneAgent();
         waitForAgentStatusPropagation(agent);
 
-        Request request = Request.Builder.preparePut()
-                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").addParameter("binary", "*:apple:*").build())
-                .setBodyGenerator(createStaticBodyGenerator("running", UTF_8))
+        Request request = Request.Builder.preparePost()
+                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(lifecycleRequestCodec, new LifecycleRequest(SlotLifecycleAction.START, forIds(appleSlot1.getId(), appleSlot2.getId()))))
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
-        List<SlotStatusRepresentation> expected = ImmutableList.of(
-                slotStatusRepresentationFactory.create(appleSlot1.status().changeInstanceId(agentInstanceId)),
-                slotStatusRepresentationFactory.create(appleSlot2.status().changeInstanceId(agentInstanceId)));
+        JobStatus job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
+
+        job = waitForCompletion(job);
+        assertSuccess(job);
 
         assertEquals(appleSlot1.status().getState(), RUNNING);
         assertEquals(appleSlot2.status().getState(), RUNNING);
         assertEquals(bananaSlot.status().getState(), STOPPED);
-        assertEqualsNoOrder(actual, expected);
     }
 
     @Test
@@ -521,18 +531,17 @@ public class TestServerIntegration
         waitForAgentStatusPropagation(agent);
 
         Assignment upgradeVersions = new Assignment("2.0", "@2.0");
+
         Request request = Request.Builder.preparePost()
-                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/assignment").addParameter("binary", "*:apple:*").build())
+                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/assignment").build())
                 .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .setBodyGenerator(jsonBodyGenerator(assignmentCodec, upgradeVersions))
+                .setBodyGenerator(jsonBodyGenerator(installationRequestCodec, new InstallationRequest(upgradeVersions, forIds(appleSlot1.getId(), appleSlot2.getId()))))
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
-        List<SlotStatusRepresentation> expected = ImmutableList.of(
-                slotStatusRepresentationFactory.create(appleSlot1.status().changeInstanceId(agentInstanceId)),
-                slotStatusRepresentationFactory.create(appleSlot2.status().changeInstanceId(agentInstanceId)));
+        JobStatus job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
-        assertEqualsNoOrder(actual, expected);
+        job = waitForCompletion(job);
+        assertSuccess(job);
 
         assertEquals(appleSlot1.status().getState(), STOPPED);
         assertEquals(appleSlot2.status().getState(), STOPPED);
@@ -550,15 +559,16 @@ public class TestServerIntegration
         waitForAgentStatusPropagation(agent);
 
         Request request = Request.Builder.prepareDelete()
-                .setUri(coordinatorUriBuilder().appendPath("/v1/slot").addParameter("binary", "*:apple:*").build())
+                .setUri(coordinatorUriBuilder().appendPath("/v1/slot").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(idAndVersionsCodec, forIds(appleSlot1.getId(), appleSlot2.getId())))
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
-        List<SlotStatusRepresentation> expected = ImmutableList.of(
-                slotStatusRepresentationFactory.create(appleSlot1.status().changeInstanceId(agentInstanceId)),
-                slotStatusRepresentationFactory.create(appleSlot2.status().changeInstanceId(agentInstanceId)));
+        JobStatus job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
-        assertEqualsNoOrder(actual, expected);
+        job = waitForCompletion(job);
+        assertSuccess(job);
+
         assertEquals(appleSlot1.status().getState(), TERMINATED);
         assertEquals(appleSlot2.status().getState(), TERMINATED);
         assertEquals(bananaSlot.status().getState(), STOPPED);
@@ -577,17 +587,18 @@ public class TestServerIntegration
         File pidFile = newFile(appleSlot1.status().getInstallPath(), "..", "installation", "launcher.pid").getCanonicalFile();
         String pidBeforeRestart = Files.readFirstLine(pidFile, Charsets.UTF_8);
 
-        Request request = Request.Builder.preparePut()
-                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").addParameter("binary", "*:apple:*").build())
-                .setBodyGenerator(createStaticBodyGenerator("restarting", UTF_8))
+
+        Request request = Request.Builder.preparePost()
+                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(lifecycleRequestCodec, new LifecycleRequest(SlotLifecycleAction.RESTART, forIds(appleSlot1.getId(), appleSlot2.getId()))))
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
-        List<SlotStatusRepresentation> expected = ImmutableList.of(
-                slotStatusRepresentationFactory.create(appleSlot1.status().changeInstanceId(agentInstanceId)),
-                slotStatusRepresentationFactory.create(appleSlot2.status().changeInstanceId(agentInstanceId)));
+        JobStatus job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
-        assertEqualsNoOrder(actual, expected);
+        job = waitForCompletion(job);
+        assertSuccess(job);
+
         assertEquals(appleSlot1.status().getState(), RUNNING);
         assertEquals(appleSlot2.status().getState(), RUNNING);
         assertEquals(bananaSlot.status().getState(), STOPPED);
@@ -607,17 +618,17 @@ public class TestServerIntegration
         bananaSlot.start();
         waitForAgentStatusPropagation(agent);
 
-        Request request = Request.Builder.preparePut()
-                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").addParameter("binary", "*:apple:*").build())
-                .setBodyGenerator(createStaticBodyGenerator("stopped", UTF_8))
+        Request request = Request.Builder.preparePost()
+                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(lifecycleRequestCodec, new LifecycleRequest(SlotLifecycleAction.STOP, forIds(appleSlot1.getId(), appleSlot2.getId()))))
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
-        List<SlotStatusRepresentation> expected = ImmutableList.of(
-                slotStatusRepresentationFactory.create(appleSlot1.status().changeInstanceId(agentInstanceId)),
-                slotStatusRepresentationFactory.create(appleSlot2.status().changeInstanceId(agentInstanceId)));
+        JobStatus job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
-        assertEqualsNoOrder(actual, expected);
+        job = waitForCompletion(job);
+        assertSuccess(job);
+
         assertEquals(appleSlot1.status().getState(), STOPPED);
         assertEquals(appleSlot2.status().getState(), STOPPED);
         assertEquals(bananaSlot.status().getState(), RUNNING);
@@ -635,22 +646,21 @@ public class TestServerIntegration
         bananaSlot.start();
         waitForAgentStatusPropagation(agent);
 
-        Request request = Request.Builder.preparePut()
-                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").addParameter("binary", "*:apple:*").build())
-                .setBodyGenerator(createStaticBodyGenerator("killing", UTF_8))
+        Request request = Request.Builder.preparePost()
+                .setUri(coordinatorUriBuilder().appendPath("/v1/slot/lifecycle").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(lifecycleRequestCodec, new LifecycleRequest(SlotLifecycleAction.KILL, forIds(appleSlot1.getId(), appleSlot2.getId()))))
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
-        List<SlotStatusRepresentation> expected = ImmutableList.of(
-                slotStatusRepresentationFactory.create(appleSlot1.status().changeInstanceId(agentInstanceId)),
-                slotStatusRepresentationFactory.create(appleSlot2.status().changeInstanceId(agentInstanceId)));
+        JobStatus job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
-        assertEqualsNoOrder(actual, expected);
+        job = waitForCompletion(job);
+        assertSuccess(job);
+
         assertEquals(appleSlot1.status().getState(), STOPPED);
         assertEquals(appleSlot2.status().getState(), STOPPED);
         assertEquals(bananaSlot.status().getState(), RUNNING);
     }
-
 
     @Test
     public void testShow()
@@ -769,5 +779,23 @@ public class TestServerIntegration
     private HttpUriBuilder coordinatorUriBuilder()
     {
         return uriBuilderFrom(coordinatorServer.getBaseUrl());
+    }
+
+    private void assertSuccess(JobStatus job)
+    {
+        assertTrue(Iterables.all(job.getSlotJobStatuses(), succeededPredicate()));
+    }
+
+    private JobStatus waitForCompletion(JobStatus job)
+    {
+        while (!Iterables.all(job.getSlotJobStatuses(), isDonePredicate())) {
+            Request request = Request.Builder.prepareGet()
+                    .setUri(coordinatorUriBuilder().appendPath("/v1/job").appendPath(job.getId().toString()).build())
+                    .build();
+
+            job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
+        }
+
+        return job;
     }
 }

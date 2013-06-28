@@ -39,7 +39,6 @@ import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.SlotStatusRepresentation.SlotStatusRepresentationFactory;
 import io.airlift.configuration.ConfigurationFactory;
 import io.airlift.configuration.ConfigurationModule;
 import io.airlift.event.client.EventModule;
@@ -76,12 +75,10 @@ import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.airship.shared.IdAndVersion.forIds;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
-import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
 import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
 import static io.airlift.airship.shared.Strings.shortestUniquePrefix;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
-import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.airlift.json.JsonCodec.listJsonCodec;
 import static java.util.Arrays.asList;
@@ -99,14 +96,12 @@ public class TestCoordinatorServer
     private Coordinator coordinator;
     private MockProvisioner provisioner;
     private InMemoryStateManager stateManager;
-    private Repository repository;
 
     private final JsonCodec<List<CoordinatorStatusRepresentation>> coordinatorStatusesCodec = listJsonCodec(CoordinatorStatusRepresentation.class);
     private final JsonCodec<List<AgentStatusRepresentation>> agentStatusesCodec = listJsonCodec(AgentStatusRepresentation.class);
     private final JsonCodec<List<SlotStatusRepresentation>> slotStatusesCodec = listJsonCodec(SlotStatusRepresentation.class);
     private final JsonCodec<CoordinatorProvisioningRepresentation> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRepresentation.class);
     private final JsonCodec<AgentProvisioningRepresentation> agentProvisioningCodec = jsonCodec(AgentProvisioningRepresentation.class);
-    private final JsonCodec<Assignment> assignmentCodec = jsonCodec(Assignment.class);
 
     private final JsonCodec<LifecycleRequest> lifecycleRequestCodec = jsonCodec(LifecycleRequest.class);
     private final JsonCodec<InstallationRequest> installationRequestCodec = jsonCodec(InstallationRequest.class);
@@ -117,7 +112,6 @@ public class TestCoordinatorServer
     private UUID apple1SlotId;
     private UUID apple2SlotId;
     private UUID bananaSlotId;
-    private SlotStatusRepresentationFactory slotStatusRepresentationFactory;
 
     @BeforeClass
     public void startServer()
@@ -181,7 +175,6 @@ public class TestCoordinatorServer
         coordinator = injector.getInstance(Coordinator.class);
         stateManager = (InMemoryStateManager) injector.getInstance(StateManager.class);
         provisioner = (MockProvisioner) injector.getInstance(Provisioner.class);
-        repository = injector.getInstance(Repository.class);
 
         server.start();
         httpClient = new ApacheHttpClient();
@@ -250,8 +243,6 @@ public class TestCoordinatorServer
         coordinator.updateAllAgents();
 
         stateManager.clearAll();
-
-        slotStatusRepresentationFactory = new SlotStatusRepresentationFactory(ImmutableList.of(appleSlotStatus1, appleSlotStatus2, bananaSlotStatus), repository);
     }
 
     @AfterClass

@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
+import com.google.common.base.Predicate;
 import io.airlift.airship.shared.SlotStatusRepresentation;
 
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 
@@ -127,4 +129,29 @@ public class SlotJobStatus
             }
         };
     }
+
+    public static Predicate<SlotJobStatus> isDonePredicate()
+    {
+        return new Predicate<SlotJobStatus>()
+        {
+            @Override
+            public boolean apply(SlotJobStatus input)
+            {
+                return input.getState().isDone();
+            }
+        };
+    }
+
+    public static Predicate<SlotJobStatus> succeededPredicate()
+    {
+        return new Predicate<SlotJobStatus>()
+        {
+            @Override
+            public boolean apply(SlotJobStatus input)
+            {
+                return input.getState() == SlotJobState.DONE;
+            }
+        };
+    }
+
 }

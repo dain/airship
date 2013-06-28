@@ -21,6 +21,7 @@ import io.airlift.airship.coordinator.auth.AuthConfig;
 import io.airlift.airship.coordinator.auth.AuthFilter;
 import io.airlift.airship.coordinator.auth.SignatureVerifier;
 import io.airlift.airship.coordinator.job.InstallationRequest;
+import io.airlift.airship.coordinator.job.JobResource;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.LifecycleRequest;
 import io.airlift.airship.shared.AgentStatusRepresentation;
@@ -55,6 +56,7 @@ public class CoordinatorMainModule
         binder.bind(CoordinatorSlotResource.class).in(Scopes.SINGLETON);
         binder.bind(CoordinatorAssignmentResource.class).in(Scopes.SINGLETON);
         binder.bind(CoordinatorLifecycleResource.class).in(Scopes.SINGLETON);
+        binder.bind(JobResource.class).in(Scopes.SINGLETON);
         binder.bind(ExpectedStateResource.class).in(Scopes.SINGLETON);
         binder.bind(InvalidSlotFilterExceptionMapper.class).in(Scopes.SINGLETON);
         binder.bind(AdminResource.class).in(Scopes.SINGLETON);
