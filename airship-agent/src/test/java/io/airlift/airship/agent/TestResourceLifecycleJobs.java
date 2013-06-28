@@ -1,18 +1,6 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.airlift.airship.agent;
 
+import io.airlift.airship.agent.job.AgentJobResource;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.airship.shared.job.SlotJobStatus.SlotJobState;
@@ -22,15 +10,19 @@ import io.airlift.node.NodeInfo;
 import io.airlift.units.Duration;
 import org.testng.annotations.BeforeMethod;
 
+import javax.ws.rs.core.Response;
+
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 import static io.airlift.airship.agent.ResourcesUtil.TEST_RESOURCES;
+import static org.testng.Assert.assertNotNull;
 
-public class TestLifecycleJobs
+public class TestResourceLifecycleJobs
         extends AbstractTestLifecycleJobs
 {
     private Agent agent;
+    private AgentJobResource agentJobResource;
 
     @BeforeMethod
     public void setup()
@@ -52,6 +44,7 @@ public class TestLifecycleJobs
                 new MockDeploymentManagerFactory(),
                 new MockLifecycleManager());
         agent.start();
+        agentJobResource = new AgentJobResource(agent);
     }
 
     @Override
@@ -63,14 +56,22 @@ public class TestLifecycleJobs
     @Override
     protected SlotJobStatus createJob(SlotJob slotJob)
     {
-        return agent.createJob(slotJob);
+        return getSlotJobStatus(agentJobResource.createJob(slotJob.getSlotJobId(), slotJob));
     }
 
     @Override
     protected SlotJobStatus updateSlotJobStatus(SlotJob slotJob, SlotJobState currentState)
             throws InterruptedException
     {
-        agent.waitForJobStateChange(slotJob.getSlotJobId(), currentState, new Duration(1, TimeUnit.MINUTES));
-        return agent.getJobStatus(slotJob.getSlotJobId());
+        return getSlotJobStatus(agentJobResource.getJobInfo(slotJob.getSlotJobId(), currentState, new Duration(1, TimeUnit.MINUTES)));
     }
+
+    private SlotJobStatus getSlotJobStatus(Response response)
+    {
+        SlotJobStatus slotJobStatus = (SlotJobStatus) response.getEntity();
+        assertNotNull(slotJobStatus, "slotJobStatus is null");
+        return slotJobStatus;
+    }
+
+
 }
