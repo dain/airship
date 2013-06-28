@@ -17,7 +17,6 @@ import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.airlift.airship.agent.job.AgentJobResource;
-import io.airlift.airship.shared.VersionConflictExceptionMapper;
 import io.airlift.configuration.ConfigurationModule;
 
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
@@ -36,8 +35,6 @@ public class AgentMainModule
         binder.bind(AgentResource.class).in(Scopes.SINGLETON);
 
         binder.bind(AgentJobResource.class).in(Scopes.SINGLETON);
-
-        binder.bind(VersionConflictExceptionMapper.class).in(Scopes.SINGLETON);
 
         binder.bind(DeploymentManagerFactory.class).to(DirectoryDeploymentManagerFactory.class).in(Scopes.SINGLETON);
         binder.bind(LifecycleManager.class).to(LauncherLifecycleManager.class).in(Scopes.SINGLETON);

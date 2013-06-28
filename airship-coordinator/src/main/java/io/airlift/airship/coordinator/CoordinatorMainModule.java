@@ -30,7 +30,6 @@ import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.VersionConflictExceptionMapper;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.discovery.client.ServiceDescriptor;
@@ -59,7 +58,6 @@ public class CoordinatorMainModule
         binder.bind(ExpectedStateResource.class).in(Scopes.SINGLETON);
         binder.bind(InvalidSlotFilterExceptionMapper.class).in(Scopes.SINGLETON);
         binder.bind(AdminResource.class).in(Scopes.SINGLETON);
-        binder.bind(VersionConflictExceptionMapper.class).in(Scopes.SINGLETON);
         binder.bind(RemoteCoordinatorFactory.class).to(HttpRemoteCoordinatorFactory.class).in(Scopes.SINGLETON);
         binder.bind(RemoteAgentFactory.class).to(HttpRemoteAgentFactory.class).in(Scopes.SINGLETON);
         binder.bind(HttpRemoteSlotJobFactory.class).in(Scopes.SINGLETON);

@@ -14,6 +14,7 @@
 package io.airlift.airship.shared;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -105,7 +106,7 @@ public class SlotStatus
         this.location = location;
         this.assignment = assignment;
         this.state = state;
-        this.version = VersionsUtil.createSlotVersion(id, state, assignment);
+        this.version = createSlotVersion(id, state, assignment);
         this.installPath = installPath;
         this.expectedState = expectedState;
         this.expectedAssignment = expectedAssignment;
@@ -320,6 +321,12 @@ public class SlotStatus
                 .add("installPath", installPath)
                 .add("resources", resources)
                 .toString();
+    }
+
+    public static String createSlotVersion(UUID id, SlotLifecycleState state, Assignment assignment)
+    {
+        String data = Joiner.on("||").useForNull("--NULL--").join(id, state, assignment);
+        return DigestUtils.md5Hex(data);
     }
 
     public static Function<SlotStatus, String> idGetter()

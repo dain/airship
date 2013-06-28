@@ -22,7 +22,6 @@ import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.InstallationHelper;
 import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.VersionsUtil;
 import io.airlift.configuration.ConfigurationFactory;
 import io.airlift.configuration.ConfigurationModule;
 import io.airlift.discovery.client.testing.TestingDiscoveryModule;
@@ -63,6 +62,7 @@ import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
+import static io.airlift.airship.shared.SlotStatus.createSlotVersion;
 import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
 import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
@@ -283,7 +283,7 @@ public class TestServer
                 .put("location", slotStatus.getLocation())
                 .put("shortLocation", slotStatus.getLocation())
                 .put("status", TERMINATED.toString())
-                .put("version", VersionsUtil.createSlotVersion(slotStatus.getId(), TERMINATED, null))
+                .put("version", createSlotVersion(slotStatus.getId(), TERMINATED, null))
                 .put("resources", ImmutableMap.<String, Integer>of())
                 .build();
 
@@ -377,7 +377,7 @@ public class TestServer
                 .put("location", slotStatus.getLocation())
                 .put("shortLocation", slotStatus.getLocation())
                 .put("status", RUNNING.toString())
-                .put("version", VersionsUtil.createSlotVersion(slotStatus.getId(), RUNNING, appleInstallation.getAssignment()))
+                .put("version", createSlotVersion(slotStatus.getId(), RUNNING, appleInstallation.getAssignment()))
                 .put("installPath", slotStatus.getInstallPath())
                 .put("resources", ImmutableMap.<String, Integer>of("memory", 512))
                 .build();
@@ -442,7 +442,7 @@ public class TestServer
                 .put("location", slotStatus.getLocation())
                 .put("shortLocation", slotStatus.getLocation())
                 .put("status", RUNNING.toString())
-                .put("version", VersionsUtil.createSlotVersion(slotStatus.getId(), RUNNING, appleInstallation.getAssignment()))
+                .put("version", createSlotVersion(slotStatus.getId(), RUNNING, appleInstallation.getAssignment()))
                 .put("installPath", slotStatus.getInstallPath())
                 .put("resources", ImmutableMap.<String, Integer>of("memory", 512))
                 .build();

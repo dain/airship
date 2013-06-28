@@ -1,10 +1,13 @@
 package io.airlift.airship.shared;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 import javax.annotation.concurrent.Immutable;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.google.common.base.Objects.firstNonNull;
 
@@ -33,7 +36,7 @@ public class CoordinatorStatus
         this.externalUri = externalUri;
         this.location = location;
         this.instanceType = instanceType;
-        this.version = VersionsUtil.createVersion(coordinatorId, state);
+        this.version = createVersion(coordinatorId, state);
     }
 
     public String getCoordinatorId()
@@ -127,6 +130,16 @@ public class CoordinatorStatus
         sb.append(", version='").append(version).append('\'');
         sb.append('}');
         return sb.toString();
+    }
+
+    private static String createVersion(String coordinatorId, CoordinatorLifecycleState state)
+    {
+        List<Object> parts = new ArrayList<>();
+        parts.add(coordinatorId);
+        parts.add(state);
+
+        String data = Joiner.on("||").useForNull("--NULL--").join(parts);
+        return DigestUtils.md5Hex(data);
     }
 
     public static Function<CoordinatorStatus, String> idGetter()

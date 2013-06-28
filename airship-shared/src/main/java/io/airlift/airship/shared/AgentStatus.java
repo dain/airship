@@ -1,17 +1,21 @@
 package io.airlift.airship.shared;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 
 import javax.annotation.concurrent.Immutable;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import static com.google.common.base.Objects.firstNonNull;
@@ -68,7 +72,7 @@ public class AgentStatus
         this.slots = Maps.uniqueIndex(slots, SlotStatus.uuidGetter());
 
         this.resources = ImmutableMap.copyOf(resources);
-        this.version = VersionsUtil.createAgentVersion(agentId, state, slots, resources);
+        this.version = createAgentVersion(agentId, state, slots, resources);
     }
 
     public String getAgentId()
@@ -211,6 +215,26 @@ public class AgentStatus
                 .add("resources", resources)
                 .add("version", version)
                 .toString();
+    }
+
+    private static String createAgentVersion(String agentId, AgentLifecycleState state, Iterable<SlotStatus> slots, Map<String, Integer> resources)
+    {
+        List<Object> parts = new ArrayList<>();
+        parts.add(agentId);
+        parts.add(state);
+
+        // canonicalize slot order
+        Map<UUID, String> slotVersions = new TreeMap<>();
+        for (SlotStatus slot : slots) {
+            slotVersions.put(slot.getId(), slot.getVersion());
+        }
+        parts.addAll(slotVersions.values());
+
+        // canonicalize resources
+        parts.add(Joiner.on("--").withKeyValueSeparator("=").join(ImmutableSortedMap.copyOf(resources)));
+
+        String data = Joiner.on("||").useForNull("--NULL--").join(parts);
+        return DigestUtils.md5Hex(data);
     }
 
     public static Function<AgentStatus, String> idGetter()
