@@ -37,9 +37,6 @@ public class AgentMainModule
 
         binder.bind(AgentJobResource.class).in(Scopes.SINGLETON);
 
-        binder.bind(SlotResource.class).in(Scopes.SINGLETON);
-        binder.bind(AssignmentResource.class).in(Scopes.SINGLETON);
-        binder.bind(LifecycleResource.class).in(Scopes.SINGLETON);
         binder.bind(VersionConflictExceptionMapper.class).in(Scopes.SINGLETON);
 
         binder.bind(DeploymentManagerFactory.class).to(DirectoryDeploymentManagerFactory.class).in(Scopes.SINGLETON);

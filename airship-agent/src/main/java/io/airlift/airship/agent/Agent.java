@@ -21,21 +21,29 @@ import com.google.common.io.Closeables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import io.airlift.airship.agent.job.InstallTaskExecution;
+import io.airlift.airship.agent.job.KillTaskExecution;
+import io.airlift.airship.agent.job.RestartTaskExecution;
 import io.airlift.airship.agent.job.SlotJobExecution;
 import io.airlift.airship.agent.job.StartTaskExecution;
+import io.airlift.airship.agent.job.StopTaskExecution;
 import io.airlift.airship.agent.job.TaskExecution;
+import io.airlift.airship.agent.job.TerminateTaskExecution;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.StateMachine;
 import io.airlift.airship.shared.StateMachine.StateChangeListener;
 import io.airlift.airship.shared.job.InstallTask;
+import io.airlift.airship.shared.job.KillTask;
+import io.airlift.airship.shared.job.RestartTask;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobId;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.airship.shared.job.SlotJobStatus.SlotJobState;
 import io.airlift.airship.shared.job.StartTask;
+import io.airlift.airship.shared.job.StopTask;
 import io.airlift.airship.shared.job.Task;
+import io.airlift.airship.shared.job.TerminateTask;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.Duration;
@@ -418,6 +426,18 @@ public class Agent
             }
             else if (task instanceof StartTask) {
                 builder.add(new StartTaskExecution((StartTask) task));
+            }
+            else if (task instanceof RestartTask) {
+                builder.add(new RestartTaskExecution((RestartTask) task));
+            }
+            else if (task instanceof StopTask) {
+                builder.add(new StopTaskExecution((StopTask) task));
+            }
+            else if (task instanceof KillTask) {
+                builder.add(new KillTaskExecution((KillTask) task));
+            }
+            else if (task instanceof TerminateTask) {
+                builder.add(new TerminateTaskExecution((TerminateTask) task));
             }
             else {
                 throw new IllegalArgumentException("Unsupported task type " + task.getClass().getSimpleName());

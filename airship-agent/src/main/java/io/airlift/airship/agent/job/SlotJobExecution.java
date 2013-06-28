@@ -65,13 +65,22 @@ public class SlotJobExecution
 
     public SlotJobStatus getStatus()
     {
+        // Be careful in this code!  There is a race condition between
+        // this job and the slot.  Always get job state before slot
+        // state because the job can finish between getting the slot state
+        // and the job state.
+        SlotJobState jobState = state.get();
+
         SlotStatusRepresentation slotStatus = null;
         if (slotId.get() != null) {
-            slotStatus = SlotStatusRepresentation.from(agent.getSlot(slotId.get()).status());
+            Slot slot = agent.getSlot(slotId.get());
+            SlotStatus status = slot.status();
+            slotStatus = SlotStatusRepresentation.from(status);
         }
+
         return new SlotJobStatus(slotJobId,
                 self,
-                state.get(),
+                jobState,
                 slotStatus,
                 progress.getDescription(),
                 progress.getProgress(),

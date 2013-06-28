@@ -126,7 +126,7 @@ public class Slot
 
         Deployment deployment = deploymentManager.getDeployment();
         if (deployment == null) {
-            slotStatus.set(createSlotStatus(id,
+            changeSlotStatus(createSlotStatus(id,
                     self,
                     externalUri,
                     null,
@@ -138,7 +138,7 @@ public class Slot
         }
         else {
             SlotLifecycleState state = lifecycleManager.status(deployment);
-            slotStatus.set(createSlotStatus(id,
+            changeSlotStatus(createSlotStatus(id,
                     self,
                     externalUri,
                     null,
@@ -236,12 +236,18 @@ public class Slot
                     deployment.getDataDir().getAbsolutePath(),
                     deployment.getResources());
 
-            this.slotStatus.set(slotStatus);
+            changeSlotStatus(slotStatus);
             return slotStatus;
         }
         finally {
             unlock();
         }
+    }
+
+    private synchronized  void changeSlotStatus(SlotStatus newStatus)
+    {
+        SlotStatus oldStatus = slotStatus.set(newStatus);
+//        new Exception(String.format("Slot %s changed from %s to %s(%s)", newStatus.getId(), oldStatus == null ? null : oldStatus.getState(), newStatus.getState(), System.identityHashCode(newStatus))).printStackTrace();
     }
 
     public SlotStatus terminate()
@@ -259,7 +265,7 @@ public class Slot
             }
 
             SlotStatus slotStatus = this.slotStatus.get().changeState(TERMINATED);
-            this.slotStatus.set(slotStatus);
+            changeSlotStatus(slotStatus);
             return slotStatus;
         }
         finally {
@@ -295,7 +301,7 @@ public class Slot
 
             SlotLifecycleState status = lifecycleManager.status(activeDeployment);
             SlotStatus slotStatus = this.slotStatus.get().changeState(status);
-            this.slotStatus.set(slotStatus);
+            changeSlotStatus(slotStatus);
             return slotStatus;
         }
         finally {
@@ -326,7 +332,7 @@ public class Slot
         SlotLifecycleState state = lifecycleManager.start(activeDeployment);
         checkState(state == RUNNING, "Start failed");
         SlotStatus slotStatus = this.slotStatus.get().changeState(state);
-        this.slotStatus.set(slotStatus);
+        changeSlotStatus(slotStatus);
         return slotStatus;
     }
 
@@ -344,7 +350,7 @@ public class Slot
             SlotLifecycleState state = lifecycleManager.restart(activeDeployment);
 
             SlotStatus slotStatus = this.slotStatus.get().changeState(state);
-            this.slotStatus.set(slotStatus);
+            changeSlotStatus(slotStatus);
             return slotStatus;
         }
         finally {
@@ -366,7 +372,7 @@ public class Slot
             SlotLifecycleState state = lifecycleManager.stop(activeDeployment);
 
             SlotStatus slotStatus = this.slotStatus.get().changeState(state);
-            this.slotStatus.set(slotStatus);
+            changeSlotStatus(slotStatus);
             return slotStatus;
         }
         finally {
@@ -388,7 +394,7 @@ public class Slot
             SlotLifecycleState state = lifecycleManager.kill(activeDeployment);
 
             SlotStatus slotStatus = this.slotStatus.get().changeState(state);
-            this.slotStatus.set(slotStatus);
+            changeSlotStatus(slotStatus);
             return slotStatus;
         }
         finally {
