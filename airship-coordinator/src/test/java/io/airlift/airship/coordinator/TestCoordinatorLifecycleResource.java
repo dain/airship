@@ -19,9 +19,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.LifecycleRequest;
-import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatus;
+import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
@@ -35,13 +35,10 @@ import org.testng.annotations.Test;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-
 import java.net.URI;
-import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static io.airlift.airship.coordinator.CoordinatorSlotResource.MIN_PREFIX_SIZE;
 import static io.airlift.airship.coordinator.TestingMavenRepository.MOCK_REPO;
 import static io.airlift.airship.shared.AgentLifecycleState.ONLINE;
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
@@ -50,9 +47,7 @@ import static io.airlift.airship.shared.ExtraAssertions.assertEqualsNoOrder;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
-import static io.airlift.airship.shared.Strings.shortestUniquePrefix;
 import static io.airlift.airship.shared.job.SlotJobStatus.slotStatusGetter;
-import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
@@ -64,7 +59,6 @@ public class TestCoordinatorLifecycleResource
 
     private Coordinator coordinator;
     private String agentId;
-    private int prefixSize;
     private UUID apple1SlotId;
     private UUID apple2SlotId;
     private UUID bananaSlotId;
@@ -128,12 +122,6 @@ public class TestCoordinatorLifecycleResource
                 "instance.type",
                 ImmutableList.of(appleSlotStatus1, appleSlotStatus2, bananaSlotStatus),
                 ImmutableMap.of("cpu", 8, "memory", 1024));
-
-        prefixSize = shortestUniquePrefix(asList(
-                appleSlotStatus1.getId().toString(),
-                appleSlotStatus2.getId().toString(),
-                bananaSlotStatus.getId().toString()),
-                MIN_PREFIX_SIZE);
 
         provisioner.addAgents(agentStatus);
         coordinator.updateAllAgents();
@@ -232,7 +220,6 @@ public class TestCoordinatorLifecycleResource
             builder.add(SlotStatusRepresentation.from(slotStatus.changeState(state)));
             assertEquals(slotStatus.getAssignment(), APPLE_ASSIGNMENT);
         }
-
 
         assertEqualsNoOrder(Iterables.transform(job.getSlotJobStatuses(), slotStatusGetter()), builder.build());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces

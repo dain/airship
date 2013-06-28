@@ -58,7 +58,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import javax.inject.Singleton;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.net.URI;
 import java.util.List;
@@ -200,7 +199,7 @@ public class TestCoordinatorServer
         assertTrue(coordinator.getAgents().isEmpty());
 
         stateManager.clearAll();
-        assertTrue(coordinator.getAllSlotStatus().isEmpty());
+        assertTrue(coordinator.getAllSlotsStatus().isEmpty());
     }
 
     private void initializeOneAgent()
@@ -552,8 +551,8 @@ public class TestCoordinatorServer
         SlotStatus apple2StatusActual = coordinator.getAgentByAgentId(agentId).getSlotStatus(apple2SlotId);
         SlotStatus bananaStatus = coordinator.getAgentByAgentId(agentId).getSlotStatus(bananaSlotId);
 
-        assertEquals(apple1StatusActual.getState(), TERMINATED);
-        assertEquals(apple2StatusActual.getState(), TERMINATED);
+        assertNull(apple1StatusActual);
+        assertNull(apple2StatusActual);
         assertEquals(bananaStatus.getState(), STOPPED);
     }
 

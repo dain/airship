@@ -7,12 +7,10 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -42,6 +40,7 @@ import io.airlift.airship.shared.job.SlotJobId;
 import io.airlift.airship.shared.job.StartTask;
 import io.airlift.airship.shared.job.StopTask;
 import io.airlift.airship.shared.job.Task;
+import io.airlift.airship.shared.job.TerminateTask;
 import io.airlift.discovery.client.ServiceDescriptor;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.log.Logger;
@@ -51,6 +50,7 @@ import io.airlift.units.Duration;
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -72,6 +72,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Predicates.compose;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
@@ -530,24 +531,28 @@ public class Coordinator
 
     public JobStatus terminate(List<IdAndVersion> slots)
     {
-        throw new UnsupportedOperationException("not yet implemented");
-        //        Preconditions.checkNotNull(slots, "slots is null");
-        //
-        //        // slots the slots
-        //        List<RemoteSlot> filteredSlots = selectRemoteSlots(slots);
-        //
-        //        return parallelCommand(filteredSlots, new Function<RemoteSlot, SlotStatus>()
-        //        {
-        //            @Override
-        //            public SlotStatus apply(RemoteSlot slot)
-        //            {
-        //                SlotStatus slotStatus = slot.terminate();
-        //                if (slotStatus.getState() == TERMINATED) {
-        //                    stateManager.deleteExpectedState(slotStatus.getId());
-        //                }
-        //                return slotStatus;
-        //            }
-        //        });
+        // 1. todo: update expected state
+
+        // 2. create a job for each slot (slot id + tasks)
+        List<RemoteSlotJob> slotJobs = new ArrayList<>();
+        for (IdAndVersion slot : slots) {
+            RemoteAgent agent = getAgentForSlot(UUID.fromString(slot.getId()));
+
+            SlotJob slotJob = new SlotJob(nextSlotJobId(), UUID.fromString(slot.getId()), ImmutableList.of(new TerminateTask()));
+            if (agent == null) {
+                slotJobs.add(new FailedRemoteSlotJob(slotJob));
+            }
+            else {
+                slotJobs.add(agent.createSlotJob(slotJob));
+            }
+        }
+
+        JobId jobId = nextJobId();
+        Job job = new Job(jobId, slotJobs);
+
+        jobs.putIfAbsent(jobId, job);
+
+        return job.getStatus();
     }
 
     public JobStatus resetExpectedState(List<IdAndVersion> slots)
@@ -573,27 +578,10 @@ public class Coordinator
         //        }));
     }
 
-    private List<RemoteSlot> selectRemoteSlots(Predicate<SlotStatus> filter)
-    {
-        // filter the slots
-        List<RemoteSlot> filteredSlots = ImmutableList.copyOf(filter(getAllSlots(), filterSlotsBy(filter)));
-        return filteredSlots;
-    }
-
-    public List<SlotStatus> getAllSlotStatus()
-    {
-        return getAllSlotsStatus(Predicates.<SlotStatus>alwaysTrue());
-    }
-
-    public List<SlotStatus> getAllSlotsStatus(Predicate<SlotStatus> slotFilter)
-    {
-        return getAllSlotsStatus(slotFilter, getAllSlots());
-    }
-
-    private List<SlotStatus> getAllSlotsStatus(Predicate<SlotStatus> slotFilter, List<RemoteSlot> allSlots)
+    public List<SlotStatus> getAllSlotsStatus()
     {
         ImmutableMap<UUID, ExpectedSlotStatus> expectedStates = Maps.uniqueIndex(stateManager.getAllExpectedStates(), ExpectedSlotStatus.uuidGetter());
-        ImmutableMap<UUID, SlotStatus> actualStates = Maps.uniqueIndex(transform(allSlots, getSlotStatus()), SlotStatus.uuidGetter());
+        ImmutableMap<UUID, SlotStatus> actualStates = Maps.uniqueIndex(transform(getAllSlots(), getSlotStatus()), SlotStatus.uuidGetter());
 
         ArrayList<SlotStatus> stats = newArrayList();
         for (UUID uuid : Sets.union(actualStates.keySet(), expectedStates.keySet())) {
@@ -644,12 +632,15 @@ public class Coordinator
                     fullSlotStatus = fullSlotStatus.changeStatusMessage(Joiner.on("; ").join(messages));
                 }
             }
-            if (slotFilter.apply(fullSlotStatus)) {
-                stats.add(fullSlotStatus);
-            }
+            stats.add(fullSlotStatus);
         }
 
         return stats;
+    }
+
+    public List<SlotStatus> getAllSlotsStatus(Predicate<SlotStatus> slotFilter)
+    {
+        return ImmutableList.copyOf(Iterables.filter(getAllSlotsStatus(), slotFilter));
     }
 
     public JobStatus doLifecycle(List<IdAndVersion> selectedSlots, SlotLifecycleAction action)
@@ -688,12 +679,12 @@ public class Coordinator
         for (IdAndVersion slot : selectedSlots) {
             RemoteAgent agent = getAgentForSlot(UUID.fromString(slot.getId()));
 
+            SlotJob slotJob = new SlotJob(nextSlotJobId(), UUID.fromString(slot.getId()), plan(action));
             if (agent == null) {
-                // TODO: create failed job
+                slotJobs.add(new FailedRemoteSlotJob(slotJob));
             }
             else {
-                RemoteSlotJob slotJob = agent.createSlotJob(new SlotJob(nextSlotJobId(), UUID.fromString(slot.getId()), plan(action)));
-                slotJobs.add(slotJob);
+                slotJobs.add(agent.createSlotJob(slotJob));
             }
         }
 
@@ -719,64 +710,54 @@ public class Coordinator
         return null;
     }
     
-    public JobStatus upgrade(Assignment assignments, List<IdAndVersion> selectedSlots, boolean force)
+    public JobStatus upgrade(Assignment assignment, List<IdAndVersion> selectedSlots, boolean force)
     {
         Set<UUID> slotIds = Stream.on(selectedSlots)
                 .transform(idGetter())
                 .transform(stringToUuidFunction())
                 .set();
 
-        Map<UUID, SlotStatus> actualStatus = Maps.uniqueIndex(getAllSlotStatus(), SlotStatus.uuidGetter());
+        List<SlotStatus> slots = getAllSlotsStatus(compose(in(slotIds), SlotStatus.uuidGetter()));
+        Map<UUID, SlotStatus> byId = Maps.uniqueIndex(slots, SlotStatus.uuidGetter());
 
-        List<SlotJob> slotJobs = new ArrayList<>();
+        // 1. todo record expected state
 
-        // 1. record new expected state
-        // TODO: deal with read-modify-update race condition when updating expected state
-        Collection<ExpectedSlotStatus> expectedStates = stateManager.getAllExpectedStates();
-        Iterable<ExpectedSlotStatus> toUpdate = Iterables.filter(expectedStates, Predicates.compose(in(slotIds), ExpectedSlotStatus.uuidGetter()));
-        for (ExpectedSlotStatus currentExpectedStatus : toUpdate) {
-            String binary = assignments.getBinary();
-            if (binary == null) {
-                binary = currentExpectedStatus.getBinary();
+        // 2. create a job for each slot (slot id + tasks)
+        List<RemoteSlotJob> slotJobs = new ArrayList<>();
+        for (IdAndVersion slot : selectedSlots) {
+
+            Assignment newAssignment;
+            SlotStatus status = byId.get(UUID.fromString(slot.getId()));
+            if (force && (status.getAssignment() == null)) {
+                // allow forced upgrading if existing assignment is missing
+                newAssignment = assignment.forceAssignment(repository);
+            }
+            else {
+                newAssignment = assignment.upgradeAssignment(repository, status.getAssignment());
             }
 
-            String config = assignments.getConfig();
-            if (config == null) {
-                config = currentExpectedStatus.getConfig();
+            SlotJob slotJob = new SlotJob(nextSlotJobId(), UUID.fromString(slot.getId()), plan(status, newAssignment));
+            RemoteAgent agent = getAgentForSlot(UUID.fromString(slot.getId()));
+            if (agent == null) {
+                slotJobs.add(new FailedRemoteSlotJob(slotJob));
             }
-
-            UUID slotId = currentExpectedStatus.getId();
-            Assignment assignment = new Assignment(binary, config);
-
-            ExpectedSlotStatus updatedStatus = new ExpectedSlotStatus(slotId, currentExpectedStatus.getStatus(), assignment);
-            stateManager.setExpectedState(updatedStatus);
-
-            // todo: pass version
-            SlotJob job = new SlotJob(nextSlotJobId(), slotId, plan(actualStatus.get(slotId), assignment));
-            slotJobs.add(job);
+            else {
+                slotJobs.add(agent.createSlotJob(slotJob));
+            }
         }
 
-        // 3. attach the job to the agent that owns the slot
-        // todo
+        JobId jobId = nextJobId();
+        Job job = new Job(jobId, slotJobs);
 
-        throw new UnsupportedOperationException("not yet implemented");
+        jobs.putIfAbsent(jobId, job);
+
+        return job.getStatus();
+
     }
 
     public JobStatus getJobStatus(JobId id)
     {
         return jobs.get(id).getStatus();
-    }
-
-    private Predicate<RemoteSlot> filterSlotsBy(final Predicate<SlotStatus> filter)
-    {
-        return new Predicate<RemoteSlot>()
-        {
-            @Override
-            public boolean apply(RemoteSlot input)
-            {
-                return filter.apply(input.status());
-            }
-        };
     }
 
     private List<RemoteSlot> getAllSlots()
@@ -845,28 +826,6 @@ public class Coordinator
                 return true;
             }
         };
-    }
-
-    private <T> ImmutableList<T> parallelCommand(Iterable<RemoteSlot> items, final Function<RemoteSlot, T> function)
-    {
-        ImmutableCollection<Collection<RemoteSlot>> slotsByInstance = Multimaps.index(items, new Function<RemoteSlot, Object>()
-        {
-            @Override
-            public Object apply(RemoteSlot input)
-            {
-                return input.status().getInstanceId();
-            }
-        }).asMap().values();
-
-        // run commands for different instances in parallel
-        return ImmutableList.copyOf(concat(parallel(slotsByInstance, new Function<Collection<RemoteSlot>, List<T>>()
-        {
-            public List<T> apply(Collection<RemoteSlot> input)
-            {
-                // but run commands for a single instance serially
-                return ImmutableList.copyOf(transform(input, function));
-            }
-        })));
     }
 
     private <F, T> ImmutableList<T> parallel(Iterable<F> items, final Function<F, T> function)
@@ -945,7 +904,16 @@ public class Coordinator
             plan.add(new StopTask());
         }
 
-        plan.add(new InstallTask(InstallationUtils.toInstallation(repository, assignment)));
+
+        URI configFile = repository.configToHttpUri(assignment.getConfig());
+
+        Installation installation = new Installation(
+                repository.configShortName(assignment.getConfig()),
+                assignment,
+                repository.binaryToHttpUri(assignment.getBinary()),
+                configFile, ImmutableMap.<String, Integer>of());
+
+        plan.add(new InstallTask(installation));
 
         if (current.getState() == RUNNING) {
             plan.add(new StartTask());

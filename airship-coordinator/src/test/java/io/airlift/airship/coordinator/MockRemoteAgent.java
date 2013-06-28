@@ -13,12 +13,14 @@ import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.KillTask;
 import io.airlift.airship.shared.job.RestartTask;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.StartTask;
 import io.airlift.airship.shared.job.StopTask;
 import io.airlift.airship.shared.job.Task;
+import io.airlift.airship.shared.job.TerminateTask;
 import io.airlift.discovery.client.ServiceDescriptor;
 
 import java.net.URI;
@@ -108,6 +110,12 @@ public class MockRemoteAgent implements RemoteAgent
             }
             else if (task instanceof KillTask) {
                 slot.kill();
+            }
+            else if (task instanceof InstallTask) {
+                slot.assign(((InstallTask) task).getInstallation());
+            }
+            else if (task instanceof TerminateTask) {
+                slot.terminate();
             }
             else {
                 throw new UnsupportedOperationException("not yet implemented: " + task.getClass().getName());

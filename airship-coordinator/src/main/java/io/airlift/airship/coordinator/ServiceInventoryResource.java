@@ -47,6 +47,6 @@ public class ServiceInventoryResource
     @Produces(MediaType.APPLICATION_JSON)
     public Response getServiceInventory()
     {
-        return Response.ok(new ServiceDescriptorsRepresentation(environment, serviceInventory.getServiceInventory(coordinator.getAllSlotStatus()))).build();
+        return Response.ok(new ServiceDescriptorsRepresentation(environment, serviceInventory.getServiceInventory(coordinator.getAllSlotsStatus()))).build();
     }
 }

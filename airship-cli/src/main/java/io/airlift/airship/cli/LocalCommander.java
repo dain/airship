@@ -55,7 +55,7 @@ public class LocalCommander implements Commander
     @Override
     public List<SlotStatusRepresentation> show(SlotFilter slotFilter)
     {
-        List<SlotStatus> allSlotStatus = coordinator.getAllSlotStatus();
+        List<SlotStatus> allSlotStatus = coordinator.getAllSlotsStatus();
         List<UUID> uuids = transform(allSlotStatus, SlotStatus.uuidGetter());
 
         Predicate<SlotStatus> slotPredicate = slotFilter.toSlotPredicate(false, uuids);
@@ -65,7 +65,7 @@ public class LocalCommander implements Commander
         // update just in case something changed
         updateServiceInventory();
 
-        return transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository));
+        return transform(slots, fromSlotStatus(coordinator.getAllSlotsStatus(), repository));
     }
 
     @Override
@@ -138,7 +138,7 @@ public class LocalCommander implements Commander
     public boolean ssh(SlotFilter slotFilter, String command)
     {
         // build predicate
-        List<UUID> uuids = transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter());
+        List<UUID> uuids = transform(coordinator.getAllSlotsStatus(), SlotStatus.uuidGetter());
         Predicate<SlotStatus> slotPredicate = slotFilter.toSlotPredicate(true, uuids);
 
         // find the matching slots
@@ -193,7 +193,7 @@ public class LocalCommander implements Commander
     {
         Predicate<AgentStatus> agentPredicate = agentFilter.toAgentPredicate(
                 transform(coordinator.getAgents(), idGetter()),
-                transform(coordinator.getAllSlotStatus(), SlotStatus.uuidGetter()),
+                transform(coordinator.getAllSlotsStatus(), SlotStatus.uuidGetter()),
                 true,
                 repository);
         List<AgentStatus> agentStatuses = coordinator.getAgents(agentPredicate);
@@ -230,7 +230,7 @@ public class LocalCommander implements Commander
 
     private void updateServiceInventory()
     {
-        List<ServiceDescriptor> inventory = serviceInventory.getServiceInventory(coordinator.getAllSlotStatus());
+        List<ServiceDescriptor> inventory = serviceInventory.getServiceInventory(coordinator.getAllSlotsStatus());
         ServiceDescriptorsRepresentation serviceDescriptors = new ServiceDescriptorsRepresentation(environment, inventory);
 
         File serviceInventoryFile = new File(localDirectory, "service-inventory.json");

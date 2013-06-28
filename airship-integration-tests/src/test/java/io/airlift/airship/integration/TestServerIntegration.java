@@ -217,7 +217,7 @@ public class TestServerIntegration
         assertTrue(coordinator.getAgents().isEmpty());
 
         stateManager.clearAll();
-        assertTrue(coordinator.getAllSlotStatus().isEmpty());
+        assertTrue(coordinator.getAllSlotsStatus().isEmpty());
     }
 
     @AfterClass

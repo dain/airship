@@ -146,7 +146,7 @@ public class TestCliIntegration
         assertTrue(coordinator.getAgents().isEmpty());
 
         stateManager.clearAll();
-        assertTrue(coordinator.getAllSlotStatus().isEmpty());
+        assertTrue(coordinator.getAllSlotsStatus().isEmpty());
 
         config = new Config();
         interactiveUser = new MockInteractiveUser(true);

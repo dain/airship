@@ -73,7 +73,7 @@ public class AdminResource
     @Produces(MediaType.APPLICATION_JSON)
     public Response getAllAgents(@Context UriInfo uriInfo)
     {
-        List<SlotStatus> allSlotStatus = coordinator.getAllSlotStatus();
+        List<SlotStatus> allSlotStatus = coordinator.getAllSlotsStatus();
         Predicate<AgentStatus> agentPredicate = AgentFilterBuilder.build(uriInfo,
                 transform(coordinator.getAgents(), idGetter()),
                 transform(allSlotStatus, SlotStatus.uuidGetter()),

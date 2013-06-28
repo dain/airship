@@ -67,14 +67,14 @@ public class CoordinatorSlotResource
     public Response getAllSlots(@Context UriInfo uriInfo)
     {
         // build filter
-        List<UUID> uuids = transform(coordinator.getAllSlotStatus(), uuidGetter());
+        List<UUID> uuids = transform(coordinator.getAllSlotsStatus(), uuidGetter());
         Predicate<SlotStatus> slotFilter = SlotFilterBuilder.build(uriInfo, false, uuids);
 
         // select slots
         List<SlotStatus> slots = coordinator.getAllSlotsStatus(slotFilter);
 
         // build response
-        return Response.ok(Iterables.transform(slots, fromSlotStatus(coordinator.getAllSlotStatus(), repository)))
+        return Response.ok(Iterables.transform(slots, fromSlotStatus(coordinator.getAllSlotsStatus(), repository)))
                 .build();
     }
 
