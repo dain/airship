@@ -445,7 +445,7 @@ public class Airship
             }
 
             if (globalOptions.batch) {
-                JobStatus job = commander.install(Lists.transform(agents, agentToIdWithoutVersion()), count, assignment);
+                JobStatus job = commander.install(Lists.transform(agents, agentToIdWithoutVersion()), assignment);
                 // todo: display progress
                 return;
             }
@@ -466,7 +466,7 @@ public class Airship
             }
 
             // install software
-            JobStatus slots = commander.install(Lists.transform(agents, agentToIdWithVersion()), count, assignment);
+            JobStatus slots = commander.install(Lists.transform(agents, agentToIdWithVersion()), assignment);
             // todo: display progress
         }
 

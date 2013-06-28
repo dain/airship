@@ -96,7 +96,15 @@ public class MockRemoteAgent implements RemoteAgent
     {
         RemoteSlot slot = Stream.on(getSlots())
                 .select(Predicates.compose(equalTo(slotJob.getSlotId()), RemoteSlotFunctions.slotIdGetter()))
-                .only();
+                .first();
+
+        if (slot == null) {
+            InstallTask task = (InstallTask) Iterables.getOnlyElement(slotJob.getTasks());
+            SlotStatus slotStatus = install(task.getInstallation());
+
+            // todo: what uri to use?
+            return new MockRemoteSlotJob(URI.create("http://foo"), slotJob, SlotStatusRepresentation.from(slotStatus));
+        }
 
         for (Task task : slotJob.getTasks()) {
             if (task instanceof StopTask) {

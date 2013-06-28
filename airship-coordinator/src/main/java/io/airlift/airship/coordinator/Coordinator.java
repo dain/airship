@@ -10,6 +10,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
@@ -470,24 +471,50 @@ public class Coordinator
         return agent.status().changeState(AgentLifecycleState.TERMINATED);
     }
 
-    public JobStatus install(List<IdAndVersion> agents, int limit, Assignment assignment)
+    public JobStatus install(List<IdAndVersion> selectedAgents, Assignment assignment)
     {
-        throw new UnsupportedOperationException("not yet implemented");
-        //        final Installation installation = InstallationUtils.toInstallation(repository, assignment);
-        //
-        //        List<RemoteAgent> targetAgents = new ArrayList<>(selectAgents(agents, installation));
-        //        targetAgents = targetAgents.subList(0, Math.min(targetAgents.size(), limit));
-        //
-        //        return parallel(targetAgents, new Function<RemoteAgent, SlotStatus>()
-        //        {
-        //            @Override
-        //            public SlotStatus apply(RemoteAgent agent)
-        //            {
-        //                SlotStatus slotStatus = agent.install(installation);
-        //                stateManager.setExpectedState(new ExpectedSlotStatus(slotStatus.getId(), STOPPED, installation.getAssignment()));
-        //                return slotStatus;
-        //            }
-        //        });
+        final Installation installation = InstallationUtils.toInstallation(repository, assignment);
+
+        Map<String, RemoteAgent> byAgentId = Maps.uniqueIndex(this.agents.values(), agentIdGetter());
+
+        // todo: update expected state
+
+        List<RemoteSlotJob> slotJobs = new ArrayList<>();
+        for (IdAndVersion agentId : selectedAgents) {
+            RemoteAgent agent = byAgentId.get(agentId.getId());
+
+            SlotJob slotJob = new SlotJob(nextSlotJobId(), null, ImmutableList.of(new InstallTask(installation)));
+            if (agent == null) {
+                slotJobs.add(new FailedRemoteSlotJob(slotJob));
+            }
+            else {
+                slotJobs.add(agent.createSlotJob(slotJob));
+            }
+        }
+
+        return createJob(slotJobs);
+    }
+
+    private static Function<RemoteAgent, String> agentIdGetter()
+    {
+        return new Function<RemoteAgent, String>()
+        {
+            @Override
+            public String apply(RemoteAgent input)
+            {
+                return input.status().getAgentId();
+            }
+        };
+    }
+
+    private JobStatus createJob(List<RemoteSlotJob> slotJobs)
+    {
+        JobId jobId = nextJobId();
+        Job job = new Job(jobId, slotJobs);
+
+        jobs.putIfAbsent(jobId, job);
+
+        return job.getStatus();
     }
 
     private List<RemoteAgent> selectAgents(Predicate<AgentStatus> filter, Installation installation)
@@ -547,12 +574,7 @@ public class Coordinator
             }
         }
 
-        JobId jobId = nextJobId();
-        Job job = new Job(jobId, slotJobs);
-
-        jobs.putIfAbsent(jobId, job);
-
-        return job.getStatus();
+        return createJob(slotJobs);
     }
 
     public JobStatus resetExpectedState(List<IdAndVersion> slots)
@@ -688,12 +710,7 @@ public class Coordinator
             }
         }
 
-        JobId jobId = nextJobId();
-        Job job = new Job(jobId, slotJobs);
-
-        jobs.putIfAbsent(jobId, job);
-
-        return job.getStatus();
+        return createJob(slotJobs);
     }
 
 
@@ -746,13 +763,7 @@ public class Coordinator
             }
         }
 
-        JobId jobId = nextJobId();
-        Job job = new Job(jobId, slotJobs);
-
-        jobs.putIfAbsent(jobId, job);
-
-        return job.getStatus();
-
+        return createJob(slotJobs);
     }
 
     public JobStatus getJobStatus(JobId id)

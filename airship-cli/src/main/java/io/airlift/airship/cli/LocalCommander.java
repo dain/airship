@@ -69,11 +69,11 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public JobStatus install(List<IdAndVersion> agents, int count, Assignment assignment)
+    public JobStatus install(List<IdAndVersion> agents, Assignment assignment)
     {
         // select the target agents
         // install the software
-        JobStatus job = coordinator.install(agents, count, assignment);
+        JobStatus job = coordinator.install(agents, assignment);
 
         // update to latest state
         updateServiceInventory();

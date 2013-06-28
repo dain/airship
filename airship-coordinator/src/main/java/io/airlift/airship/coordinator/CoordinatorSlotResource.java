@@ -81,13 +81,9 @@ public class CoordinatorSlotResource
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response install(
-            InstallationRequest request,
-            @DefaultValue("1") @QueryParam("limit") int limit,
-            @Context UriInfo uriInfo)
+    public Response install(InstallationRequest request, @Context UriInfo uriInfo)
     {
         Preconditions.checkNotNull(request, "request must not be null");
-        Preconditions.checkArgument(limit > 0, "limit must be at least 1");
 
         if (request.getIdsAndVersions().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -96,7 +92,7 @@ public class CoordinatorSlotResource
         }
 
         // install the software
-        JobStatus job = coordinator.install(request.getIdsAndVersions(), limit, request.getAssignment());
+        JobStatus job = coordinator.install(request.getIdsAndVersions(), request.getAssignment());
 
         return makeJobStatusResponse(Response.Status.CREATED, uriInfo, job);
     }

@@ -74,7 +74,7 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public JobStatus install(List<IdAndVersion> agents, int count, Assignment assignment)
+    public JobStatus install(List<IdAndVersion> agents, Assignment assignment)
     {
         // todo
         throw new UnsupportedOperationException("not yet implemented");

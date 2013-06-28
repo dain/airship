@@ -14,7 +14,7 @@ public interface Commander
 {
     List<SlotStatusRepresentation> show(SlotFilter slotFilter);
 
-    JobStatus install(List<IdAndVersion> agents, int count, Assignment assignment);
+    JobStatus install(List<IdAndVersion> agents, Assignment assignment);
 
     JobStatus upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force);
 
