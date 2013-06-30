@@ -14,6 +14,7 @@ import io.airlift.airship.agent.LauncherLifecycleManager;
 import io.airlift.airship.agent.LifecycleManager;
 import io.airlift.airship.agent.Progress;
 import io.airlift.airship.agent.Slot;
+import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.CoordinatorConfig;
 import io.airlift.airship.coordinator.HttpRepository;
 import io.airlift.airship.coordinator.HttpServiceInventory;
@@ -29,7 +30,6 @@ import io.airlift.airship.coordinator.RemoteSlot;
 import io.airlift.airship.coordinator.RemoteSlotJob;
 import io.airlift.airship.coordinator.ServiceInventory;
 import io.airlift.airship.coordinator.StateManager;
-import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
@@ -41,6 +41,9 @@ import io.airlift.airship.shared.RepositorySet;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.discovery.client.ServiceDescriptor;
+import io.airlift.http.client.HttpClientConfig;
+import io.airlift.http.client.netty.NettyAsyncHttpClient;
+import io.airlift.http.client.netty.NettyIoPool;
 import io.airlift.json.JsonCodec;
 import io.airlift.units.Duration;
 
@@ -76,6 +79,7 @@ public class CommanderFactory
     private boolean useInternalAddress;
     private boolean allowDuplicateInstallations;
     private final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setDaemon(true).setNameFormat("agent-%d").build());
+    private NettyAsyncHttpClient client = new NettyAsyncHttpClient("commander", new HttpClientConfig(), new NettyIoPool("commander"));
 
     public CommanderFactory setEnvironment(String environment)
     {
@@ -162,7 +166,7 @@ public class CommanderFactory
 
         String scheme = coordinatorUri.getScheme();
         if ("http".equals(scheme)) {
-            return new HttpCommander(coordinatorUri, useInternalAddress);
+            return new HttpCommander(coordinatorUri, useInternalAddress, client, executor);
         }
         else if ("file".equals(scheme) || scheme == null) {
             return createLocalCommander();
@@ -249,7 +253,8 @@ public class CommanderFactory
         return new LocalCommander(environment, new File(slotsDir), coordinator, repository, serviceInventory);
     }
 
-    private class LocalProvisioner implements Provisioner
+    private class LocalProvisioner
+            implements Provisioner
     {
         @Override
         public List<Instance> listCoordinators()
@@ -296,7 +301,8 @@ public class CommanderFactory
         }
     }
 
-    private class LocalRemoteCoordinatorFactory implements RemoteCoordinatorFactory
+    private class LocalRemoteCoordinatorFactory
+            implements RemoteCoordinatorFactory
     {
         @Override
         public RemoteCoordinator createRemoteCoordinator(Instance instance, CoordinatorLifecycleState state)
@@ -305,7 +311,8 @@ public class CommanderFactory
         }
     }
 
-    private class LocalRemoteAgentFactory implements RemoteAgentFactory
+    private class LocalRemoteAgentFactory
+            implements RemoteAgentFactory
     {
         private final Agent agent;
 
@@ -322,7 +329,8 @@ public class CommanderFactory
         }
     }
 
-    private class LocalRemoteAgent implements RemoteAgent
+    private class LocalRemoteAgent
+            implements RemoteAgent
     {
         private final Agent agent;
 
@@ -390,7 +398,8 @@ public class CommanderFactory
         }
     }
 
-    private static class LocalRemoteSlot implements RemoteSlot
+    private static class LocalRemoteSlot
+            implements RemoteSlot
     {
         private final Slot slot;
         private final String instanceId;
@@ -450,7 +459,8 @@ public class CommanderFactory
         }
     }
 
-    public static class ToUriFunction implements Function<String, URI>
+    public static class ToUriFunction
+            implements Function<String, URI>
     {
         public URI apply(String uri)
         {

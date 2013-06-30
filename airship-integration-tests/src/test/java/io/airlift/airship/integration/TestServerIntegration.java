@@ -49,6 +49,7 @@ import io.airlift.airship.integration.MockLocalProvisioner.CoordinatorServer;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
@@ -85,6 +86,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import javax.ws.rs.core.Response.Status;
+
 import java.io.File;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +106,6 @@ import static io.airlift.airship.shared.InstallationHelper.APPLE_INSTALLATION;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
-import static io.airlift.airship.shared.job.SlotJobStatus.isDonePredicate;
 import static io.airlift.airship.shared.job.SlotJobStatus.succeededPredicate;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
@@ -788,12 +789,15 @@ public class TestServerIntegration
 
     private JobStatus waitForCompletion(JobStatus job)
     {
-        while (!Iterables.all(job.getSlotJobStatuses(), isDonePredicate())) {
+        while (!job.getState().isDone()) {
             Request request = Request.Builder.prepareGet()
-                    .setUri(coordinatorUriBuilder().appendPath("/v1/job").appendPath(job.getId().toString()).build())
+                    .setUri(coordinatorUriBuilder().appendPath("/v1/job").appendPath(job.getJobId().toString()).build())
+                    .setHeader(AirshipHeaders.AIRSHIP_CURRENT_STATE, job.getVersion())
+                    .setHeader(AirshipHeaders.AIRSHIP_MAX_WAIT, "200ms")
                     .build();
 
             job = httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
+            System.err.println("XXXX" + job);
         }
 
         return job;

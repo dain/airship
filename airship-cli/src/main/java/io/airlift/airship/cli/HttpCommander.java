@@ -5,7 +5,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import io.airlift.airship.coordinator.AgentProvisioningRepresentation;
 import io.airlift.airship.coordinator.CoordinatorProvisioningRepresentation;
+import io.airlift.airship.coordinator.job.InstallationRequest;
 import io.airlift.airship.coordinator.job.JobStatus;
+import io.airlift.airship.coordinator.job.LifecycleRequest;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatusRepresentation;
@@ -14,25 +16,30 @@ import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.http.client.ApacheHttpClient;
+import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.http.client.BodyGenerator;
 import io.airlift.http.client.FullJsonResponseHandler.JsonResponse;
-import io.airlift.http.client.HttpClient;
-import io.airlift.http.client.HttpClientConfig;
 import io.airlift.http.client.Request;
 import io.airlift.json.JsonCodec;
+
+import javax.ws.rs.core.Response.Status;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
+import static io.airlift.json.JsonCodec.jsonCodec;
+import static io.airlift.json.JsonCodec.listJsonCodec;
+import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 
 public class HttpCommander implements Commander
 {
@@ -48,17 +55,24 @@ public class HttpCommander implements Commander
     private static final JsonCodec<List<AgentStatusRepresentation>> AGENTS_CODEC = JsonCodec.listJsonCodec(AgentStatusRepresentation.class);
     private static final JsonCodec<AgentProvisioningRepresentation> AGENT_PROVISIONING_CODEC = JsonCodec.jsonCodec(AgentProvisioningRepresentation.class);
 
-    private final HttpClient client;
+    private final JsonCodec<LifecycleRequest> lifecycleRequestCodec = jsonCodec(LifecycleRequest.class);
+    private final JsonCodec<InstallationRequest> installationRequestCodec = jsonCodec(InstallationRequest.class);
+    private final JsonCodec<JobStatus> jobStatusCodec = jsonCodec(JobStatus.class);
+    private final JsonCodec<List<IdAndVersion>> idAndVersionsCodec = listJsonCodec(IdAndVersion.class);
+
+    private final AsyncHttpClient client;
     private final URI coordinatorUri;
     private final boolean useInternalAddress;
+    private final Executor executor;
 
-    public HttpCommander(URI coordinatorUri, boolean useInternalAddress)
+    public HttpCommander(URI coordinatorUri, boolean useInternalAddress, AsyncHttpClient client, Executor executor)
             throws IOException
     {
         Preconditions.checkNotNull(coordinatorUri, "coordinatorUri is null");
         this.coordinatorUri = coordinatorUri;
-        this.client = new ApacheHttpClient(new HttpClientConfig());
+        this.client = client;
         this.useInternalAddress = useInternalAddress;
+        this.executor = executor;
     }
 
     @Override
@@ -74,70 +88,59 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public JobStatus install(List<IdAndVersion> agents, Assignment assignment)
+    public HttpRemoteJob install(List<IdAndVersion> agents, Assignment assignment)
     {
-        // todo
-        throw new UnsupportedOperationException("not yet implemented");
+        Request request = Request.Builder.preparePost()
+                .setUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(installationRequestCodec, new InstallationRequest(assignment, agents)))
+                .build();
 
-//        URI uri = uriBuilderFrom(coordinatorUri).replacePath("/v1/slot").build();
-//        Request.Builder requestBuilder = Request.Builder.preparePost()
-//                .setUri(uri)
-//                .setHeader("Content-Type", "application/json")
-//                .setBodyGenerator(jsonBodyGenerator(ASSIGNMENT_CODEC, AssignmentRepresentation.from(assignment)));
-//
-//        List<SlotStatusRepresentation> slots = client.execute(requestBuilder.build(), createJsonResponseHandler(SLOTS_CODEC));
-//        return slots;
+        JobStatus jobStatus = client.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
+        return HttpRemoteJob.createHttpRemoteJob(jobStatus, client, executor, jobStatusCodec);
     }
 
     @Override
-    public JobStatus upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force)
+    public HttpRemoteJob upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force)
     {
-        // todo
-        throw new UnsupportedOperationException("not yet implemented");
+        Request request = Request.Builder.preparePost()
+                .setUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot/assignment").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(installationRequestCodec, new InstallationRequest(assignment, slots)))
+                .build();
 
-//        URI uri = uriBuilderFrom(coordinatorUri).replacePath("/v1/slot/assignment").build();
-//        Request.Builder requestBuilder = Request.Builder.preparePost()
-//                .setUri(uri)
-//                .setHeader("Content-Type", "application/json")
-//                .setBodyGenerator(jsonBodyGenerator(UPGRADE_VERSIONS_CODEC, upgradeVersions));
-//        if (force) {
-//            requestBuilder.setHeader(AIRSHIP_FORCE_HEADER, "true");
-//        }
-//
-//        return client.execute(requestBuilder.build(), createJsonResponseHandler(JOB_INFO_CODEC));
+        JobStatus jobStatus = client.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
+        return HttpRemoteJob.createHttpRemoteJob(jobStatus, client, executor, jobStatusCodec);
     }
 
     @Override
-    public JobStatus doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction action)
+    public HttpRemoteJob doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction action)
     {
-        // todo
-        throw new UnsupportedOperationException("not yet implemented");
-//        URI uri = slotFilter.toUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot/lifecycle"));
-//        Request.Builder requestBuilder = Request.Builder.preparePut()
-//                .setUri(uri)
-//                .setBodyGenerator(textBodyGenerator(state.name()));
-//
-//        return client.execute(requestBuilder.build(), createJsonResponseHandler(JOB_INFO_CODEC));
+        Request request = Request.Builder.preparePost()
+                .setUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot/lifecycle").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(lifecycleRequestCodec, new LifecycleRequest(action, slots)))
+                .build();
+
+        JobStatus jobStatus = client.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
+        return HttpRemoteJob.createHttpRemoteJob(jobStatus, client, executor, jobStatusCodec);
     }
 
     @Override
-    public JobStatus terminate(List<IdAndVersion> slots)
+    public HttpRemoteJob terminate(List<IdAndVersion> slots)
     {
-        // todo
-        throw new UnsupportedOperationException("not yet implemented");
+        Request request = Request.Builder.prepareDelete()
+                .setUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot").build())
+                .setHeader(CONTENT_TYPE, APPLICATION_JSON)
+                .setBodyGenerator(jsonBodyGenerator(idAndVersionsCodec, slots))
+                .build();
 
-//        URI uri = slotFilter.toUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot"));
-//        Request.Builder requestBuilder = Request.Builder.prepareDelete().setUri(uri);
-//        if (expectedVersion != null) {
-//            requestBuilder.setHeader(AIRSHIP_SLOTS_VERSION_HEADER, expectedVersion);
-//        }
-//
-//        List<SlotStatusRepresentation> slots = client.execute(requestBuilder.build(), createJsonResponseHandler(SLOTS_CODEC));
-//        return slots;
+        JobStatus job = client.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
+        return HttpRemoteJob.createHttpRemoteJob(job, client, executor, jobStatusCodec);
     }
 
     @Override
-    public JobStatus resetExpectedState(List<IdAndVersion> slots)
+    public HttpRemoteJob resetExpectedState(List<IdAndVersion> slots)
     {
         // todo
         throw new UnsupportedOperationException("not yet implemented");
@@ -189,7 +192,7 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public JobStatus provisionCoordinators(String coordinatorConfig,
+    public HttpRemoteJob provisionCoordinators(String coordinatorConfig,
             int coordinatorCount,
             String instanceType,
             String availabilityZone,
@@ -215,19 +218,8 @@ public class HttpCommander implements Commander
                 .setBodyGenerator(jsonBodyGenerator(COORDINATOR_PROVISIONING_CODEC, coordinatorProvisioning))
                 .build();
 
-        JobStatus job = client.execute(request, createJsonResponseHandler(JOB_INFO_CODEC));
-
-        // todo
-        throw new UnsupportedOperationException("not yet implemented");
-//        if (waitForStartup) {
-//            List<String> instanceIds = newArrayList();
-//            for (CoordinatorStatusRepresentation coordinator : coordinators) {
-//                instanceIds.add(coordinator.getInstanceId());
-//            }
-//            coordinators = waitForCoordinatorsToStart(instanceIds);
-//        }
-//
-//        return job;
+        JobStatus jobStatus = client.execute(request, createJsonResponseHandler(JOB_INFO_CODEC));
+        return HttpRemoteJob.createHttpRemoteJob(jobStatus, client, executor, jobStatusCodec);
     }
 
     private List<CoordinatorStatusRepresentation> waitForCoordinatorsToStart(List<String> instanceIds)
@@ -291,7 +283,7 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public JobStatus provisionAgents(String agentConfig,
+    public HttpRemoteJob provisionAgents(String agentConfig,
             int agentCount,
             String instanceType,
             String availabilityZone,
@@ -317,19 +309,8 @@ public class HttpCommander implements Commander
                 .setBodyGenerator(jsonBodyGenerator(AGENT_PROVISIONING_CODEC, agentProvisioning))
                 .build();
 
-        JobStatus job = client.execute(request, createJsonResponseHandler(JOB_INFO_CODEC));
-
-        // todo
-        throw new UnsupportedOperationException("not yet implemented");
-//        if (waitForStartup) {
-//            List<String> instanceIds = newArrayList();
-//            for (AgentStatusRepresentation agent : agents) {
-//                instanceIds.add(agent.getInstanceId());
-//            }
-//            agents = waitForAgentsToStart(instanceIds);
-//        }
-//
-//        return job;
+        JobStatus jobStatus = client.execute(request, createJsonResponseHandler(JOB_INFO_CODEC));
+        return HttpRemoteJob.createHttpRemoteJob(jobStatus, client, executor, jobStatusCodec);
     }
 
     private List<AgentStatusRepresentation> waitForAgentsToStart(List<String> instanceIds)
@@ -362,7 +343,7 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public JobStatus terminateAgent(String agentId)
+    public HttpRemoteJob terminateAgent(String agentId)
     {
         // todo
         throw new UnsupportedOperationException("not yet implemented");

@@ -1,6 +1,5 @@
 package io.airlift.airship.cli;
 
-import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Assignment;
@@ -14,21 +13,21 @@ public interface Commander
 {
     List<SlotStatusRepresentation> show(SlotFilter slotFilter);
 
-    JobStatus install(List<IdAndVersion> agents, Assignment assignment);
+    RemoteJob install(List<IdAndVersion> agents, Assignment assignment);
 
-    JobStatus upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force);
+    RemoteJob upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force);
 
-    JobStatus doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction state);
+    RemoteJob doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction state);
 
-    JobStatus terminate(List<IdAndVersion> slots);
+    RemoteJob terminate(List<IdAndVersion> slots);
 
-    JobStatus resetExpectedState(List<IdAndVersion> slots);
+    RemoteJob resetExpectedState(List<IdAndVersion> slots);
 
     boolean ssh(SlotFilter slotFilter, String command);
 
     List<CoordinatorStatusRepresentation> showCoordinators(CoordinatorFilter coordinatorFilter);
 
-    JobStatus provisionCoordinators(String coordinatorConfig,
+    RemoteJob provisionCoordinators(String coordinatorConfig,
             int coordinatorCount,
             String instanceType,
             String availabilityZone,
@@ -41,7 +40,7 @@ public interface Commander
 
     List<AgentStatusRepresentation> showAgents(AgentFilter agentFilter);
 
-    JobStatus provisionAgents(String agentConfig,
+    RemoteJob provisionAgents(String agentConfig,
             int agentCount,
             String instanceType,
             String availabilityZone,
@@ -50,7 +49,7 @@ public interface Commander
             String securityGroup,
             boolean waitForStartup);
 
-    JobStatus terminateAgent(String agentId);
+    RemoteJob terminateAgent(String agentId);
 
     boolean sshAgent(AgentFilter agentFilter, String command);
 }

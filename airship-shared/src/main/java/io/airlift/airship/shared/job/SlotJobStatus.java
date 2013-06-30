@@ -7,7 +7,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
 import io.airlift.airship.shared.SlotStatusRepresentation;
 
-import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.List;
 
@@ -15,9 +14,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class SlotJobStatus
 {
-    private final URI self;
-
-    public static enum SlotJobState {
+    public static enum SlotJobState
+    {
         PENDING(false),
         RUNNING(false),
         DONE(true),
@@ -38,6 +36,7 @@ public class SlotJobStatus
     }
 
     private final SlotJobId slotJobId;
+    private final URI self;
     private final SlotJobState state;
     private final SlotStatusRepresentation slotStatus;
     private final String progressDescription;

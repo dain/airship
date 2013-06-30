@@ -133,6 +133,7 @@ public class HttpRemoteSlotJob
         }
     }
 
+    @Override
     public void addStateChangeListener(StateChangeListener<SlotJobStatus> stateChangeListener)
     {
         try (SetThreadName setThreadName = new SetThreadName(slotJobStatus.getName())) {

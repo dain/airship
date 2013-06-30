@@ -15,7 +15,7 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.airlift.airship.coordinator.job.Job;
+import io.airlift.airship.coordinator.job.JobExecution;
 import io.airlift.airship.coordinator.job.JobId;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
@@ -32,6 +32,7 @@ import io.airlift.airship.shared.InstallationUtils;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.shared.StateMachine.StateChangeListener;
 import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.KillTask;
 import io.airlift.airship.shared.job.RestartTask;
@@ -49,6 +50,7 @@ import io.airlift.units.Duration;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -73,6 +75,7 @@ import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
+import static io.airlift.airship.coordinator.job.JobExecution.createJobExecution;
 import static io.airlift.airship.shared.IdAndVersion.idGetter;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
@@ -87,7 +90,7 @@ public class Coordinator
 
     private final CoordinatorStatus coordinatorStatus;
     private final Repository repository;
-    private final ScheduledExecutorService timerService;
+    private final ScheduledExecutorService executor;
     private final Duration statusExpiration;
     private final Provisioner provisioner;
     private final RemoteCoordinatorFactory remoteCoordinatorFactory;
@@ -95,11 +98,10 @@ public class Coordinator
     private final ServiceInventory serviceInventory;
     private final StateManager stateManager;
 
-
     private final AtomicLong nextJobId = new AtomicLong();
     private final AtomicLong nextSlotJobId = new AtomicLong();
 
-    private final ConcurrentMap<JobId, Job> jobs = new ConcurrentHashMap<>();
+    private final ConcurrentMap<JobId, JobExecution> jobs = new ConcurrentHashMap<>();
 
     @Inject
     public Coordinator(NodeInfo nodeInfo,
@@ -156,7 +158,7 @@ public class Coordinator
         this.serviceInventory = serviceInventory;
         this.statusExpiration = statusExpiration;
 
-        timerService = Executors.newScheduledThreadPool(10, new ThreadFactoryBuilder().setNameFormat("coordinator-agent-monitor").setDaemon(true).build());
+        executor = Executors.newScheduledThreadPool(10, new ThreadFactoryBuilder().setNameFormat("coordinator-agent-monitor").setDaemon(true).build());
 
         updateAllCoordinatorsAndWait();
         updateAllAgents();
@@ -165,7 +167,7 @@ public class Coordinator
     @PostConstruct
     public void start()
     {
-        timerService.scheduleWithFixedDelay(new Runnable()
+        executor.scheduleWithFixedDelay(new Runnable()
         {
             @Override
             public void run()
@@ -179,7 +181,7 @@ public class Coordinator
             }
         }, 0, (long) statusExpiration.toMillis(), TimeUnit.MILLISECONDS);
 
-        timerService.scheduleWithFixedDelay(new Runnable()
+        executor.scheduleWithFixedDelay(new Runnable()
         {
             @Override
             public void run()
@@ -497,11 +499,11 @@ public class Coordinator
     private JobStatus createJob(List<RemoteSlotJob> slotJobs)
     {
         JobId jobId = nextJobId();
-        Job job = new Job(jobId, slotJobs);
 
-        jobs.putIfAbsent(jobId, job);
+        JobExecution jobExecution = createJobExecution(this, jobId, slotJobs, executor);
+        jobs.putIfAbsent(jobId, jobExecution);
 
-        return job.getStatus();
+        return jobExecution.getStatus();
     }
 
     public JobStatus terminate(List<IdAndVersion> slots)
@@ -715,9 +717,40 @@ public class Coordinator
         return createJob(slotJobs);
     }
 
-    public JobStatus getJobStatus(JobId id)
+    public JobStatus getJobStatus(JobId jobId)
     {
-        return jobs.get(id).getStatus();
+        JobExecution job = jobs.get(jobId);
+        if (job == null) {
+            return null;
+        }
+        return job.getStatus();
+    }
+
+    public void addStateChangeListener(JobId jobId, StateChangeListener<JobStatus> stateChangeListener)
+    {
+        jobs.get(jobId).addStateChangeListener(stateChangeListener);
+    }
+
+    public Duration waitForJobVersionChange(JobId jobId, String currentVersion, Duration maxWait)
+            throws InterruptedException
+    {
+        JobExecution job = jobs.get(jobId);
+        if (job == null) {
+            return maxWait;
+        }
+        return job.waitForJobVersionChange(currentVersion, maxWait);
+    }
+
+    public JobStatus cancelJob(JobId jobId)
+    {
+        checkNotNull(jobId, "jobId is null");
+
+        JobExecution job = jobs.get(jobId);
+        if (job == null) {
+            return null;
+        }
+        job.cancel();
+        return job.getStatus();
     }
 
     private List<RemoteSlot> getAllSlots()

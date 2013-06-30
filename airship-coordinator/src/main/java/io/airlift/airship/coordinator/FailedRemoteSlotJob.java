@@ -1,6 +1,7 @@
 package io.airlift.airship.coordinator;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.airship.shared.StateMachine.StateChangeListener;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.airship.shared.job.SlotJobStatus.SlotJobState;
@@ -33,5 +34,10 @@ public class FailedRemoteSlotJob
     public SlotJobStatus getJobStatus()
     {
         return slotJobStatus;
+    }
+
+    @Override
+    public void addStateChangeListener(StateChangeListener<SlotJobStatus> stateChangeListener)
+    {
     }
 }

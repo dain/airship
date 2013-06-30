@@ -10,7 +10,7 @@ public class JobInfoUtil
     {
         URI nextUri = uriInfo.getBaseUriBuilder()
                 .replacePath("/v1/job")
-                .path(jobStatus.getId().toString())
+                .path(jobStatus.getJobId().toString())
                 .build();
 
         return Response.status(status)

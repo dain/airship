@@ -69,7 +69,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public JobStatus install(List<IdAndVersion> agents, Assignment assignment)
+    public RemoteJob install(List<IdAndVersion> agents, Assignment assignment)
     {
         // select the target agents
         // install the software
@@ -78,11 +78,11 @@ public class LocalCommander implements Commander
         // update to latest state
         updateServiceInventory();
 
-        return job;
+        return new LocalRemoteJob(job.getJobId(), coordinator);
     }
 
     @Override
-    public JobStatus upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force)
+    public RemoteJob upgrade(List<IdAndVersion> slots, Assignment assignment, boolean force)
     {
         // upgrade slots
         JobStatus job = coordinator.upgrade(assignment, slots, force);
@@ -90,11 +90,11 @@ public class LocalCommander implements Commander
         // update to latest state
         updateServiceInventory();
 
-        return job;
+        return new LocalRemoteJob(job.getJobId(), coordinator);
     }
 
     @Override
-    public JobStatus doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction state)
+    public RemoteJob doLifecycle(List<IdAndVersion> slots, SlotLifecycleAction state)
     {
         // before changing state (like starting) update just in case something changed
         updateServiceInventory();
@@ -105,11 +105,11 @@ public class LocalCommander implements Commander
         // update to latest state
         updateServiceInventory();
 
-        return job;
+        return new LocalRemoteJob(job.getJobId(), coordinator);
     }
 
     @Override
-    public JobStatus terminate(List<IdAndVersion> slots)
+    public RemoteJob terminate(List<IdAndVersion> slots)
     {
         // terminate slots
         JobStatus job = coordinator.terminate(slots);
@@ -118,11 +118,11 @@ public class LocalCommander implements Commander
         updateServiceInventory();
 
         // build results
-        return job;
+        return new LocalRemoteJob(job.getJobId(), coordinator);
     }
 
     @Override
-    public JobStatus resetExpectedState(List<IdAndVersion> slots)
+    public RemoteJob resetExpectedState(List<IdAndVersion> slots)
     {
         // rest slots expected state
         JobStatus job = coordinator.resetExpectedState(slots);
@@ -130,8 +130,7 @@ public class LocalCommander implements Commander
         // update just in case something changed
         updateServiceInventory();
 
-
-        return job;
+        return new LocalRemoteJob(job.getJobId(), coordinator);
     }
 
     @Override
@@ -170,7 +169,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public JobStatus provisionCoordinators(String coordinatorConfigSpec,
+    public RemoteJob provisionCoordinators(String coordinatorConfigSpec,
             int coordinatorCount,
             String instanceType,
             String availabilityZone,
@@ -204,7 +203,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public JobStatus provisionAgents(String agentConfig,
+    public RemoteJob provisionAgents(String agentConfig,
             int agentCount,
             String instanceType,
             String availabilityZone,
@@ -217,7 +216,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public JobStatus terminateAgent(String agentId)
+    public RemoteJob terminateAgent(String agentId)
     {
         throw new UnsupportedOperationException("Agents can not be terminated in local mode");
     }

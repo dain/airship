@@ -20,6 +20,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -54,8 +55,10 @@ import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
 import io.airlift.log.LoggingMBean;
 import io.airlift.node.NodeInfo;
+import io.airlift.units.Duration;
 
 import javax.inject.Inject;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -79,6 +82,7 @@ import static io.airlift.airship.shared.ConfigUtils.createConfigurationFactory;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilder;
 import static io.airlift.airship.shared.SlotStatusRepresentation.slotToIdWithVersion;
 import static io.airlift.airship.shared.SlotStatusRepresentation.slotToIdWithoutVersion;
+import static io.airlift.airship.shared.job.SlotJobStatus.slotStatusGetter;
 import static java.lang.Boolean.parseBoolean;
 import static java.lang.String.format;
 import static java.util.UUID.randomUUID;
@@ -321,6 +325,26 @@ public class Airship
             slotExecution.execute(commander, Lists.transform(response, slotToIdWithVersion()));
         }
 
+        public void displayProgress(RemoteJob job)
+        {
+            while (true) {
+                JobStatus jobStatus = job.getJobStatus();
+
+                if (jobStatus.getState().isDone()) {
+                    displaySlots(Iterables.transform(jobStatus.getSlotJobStatuses(), slotStatusGetter()));
+                    return;
+                }
+
+                try {
+                    job.waitForJobVersionChange(jobStatus.getVersion(), new Duration(200, TimeUnit.MILLISECONDS));
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
         public void displaySlots(Iterable<SlotStatusRepresentation> slots)
         {
             outputFormat.displaySlots(slots);
@@ -445,8 +469,8 @@ public class Airship
             }
 
             if (globalOptions.batch) {
-                JobStatus job = commander.install(Lists.transform(agents, agentToIdWithoutVersion()), assignment);
-                // todo: display progress
+                RemoteJob job = commander.install(Lists.transform(agents, agentToIdWithoutVersion()), assignment);
+                displayProgress(job);
                 return;
             }
 
@@ -466,8 +490,8 @@ public class Airship
             }
 
             // install software
-            JobStatus slots = commander.install(Lists.transform(agents, agentToIdWithVersion()), assignment);
-            // todo: display progress
+            RemoteJob job = commander.install(Lists.transform(agents, agentToIdWithVersion()), assignment);
+            displayProgress(job);
         }
 
         @Override
@@ -556,8 +580,8 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.terminate(slots);
-                    // todo: display progress
+                    RemoteJob job = commander.terminate(slots);
+                    displayProgress(job);
                 }
             });
         }
@@ -587,8 +611,8 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.START);
-                    // todo: display progress
+                    RemoteJob job = commander.doLifecycle(slots, SlotLifecycleAction.START);
+                    displayProgress(job);
                 }
             });
         }
@@ -607,8 +631,8 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.STOP);
-                    // todo: display progress
+                    RemoteJob job = commander.doLifecycle(slots, SlotLifecycleAction.STOP);
+                    displayProgress(job);
                 }
             });
         }
@@ -627,8 +651,8 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.KILL);
-                    // todo: display progress
+                    RemoteJob job = commander.doLifecycle(slots, SlotLifecycleAction.KILL);
+                    displayProgress(job);
                 }
             });
         }
@@ -647,8 +671,8 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.doLifecycle(slots, SlotLifecycleAction.RESTART);
-                    // todo: display progress
+                    RemoteJob job = commander.doLifecycle(slots, SlotLifecycleAction.RESTART);
+                    displayProgress(job);
                 }
             });
         }
@@ -667,8 +691,8 @@ public class Airship
             {
                 public void execute(Commander commander, List<IdAndVersion> slots)
                 {
-                    JobStatus job = commander.resetExpectedState(slots);
-                    // todo: display progress
+                    RemoteJob job = commander.resetExpectedState(slots);
+                    displayProgress(job);
                 }
             });
         }
@@ -759,7 +783,7 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            JobStatus job = commander.provisionCoordinators(coordinatorConfig,
+            RemoteJob job = commander.provisionCoordinators(coordinatorConfig,
                     count,
                     instanceType,
                     availabilityZone,
@@ -768,8 +792,7 @@ public class Airship
                     securityGroup,
                     !noWait);
 
-            // todo: display progress and wait for coordinators to be provisioned
-            throw new UnsupportedOperationException("not yet implemented");
+            displayProgress(job);
 
 //            // add the new coordinators to the config
 //            String coordinatorProperty = "environment." + environmentRef + ".coordinator";
@@ -885,7 +908,7 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            JobStatus agents = commander.provisionAgents(agentConfig, count, instanceType, availabilityZone, ami, keyPair, securityGroup, !noWait);
+            RemoteJob agents = commander.provisionAgents(agentConfig, count, instanceType, availabilityZone, ami, keyPair, securityGroup, !noWait);
 
             // todo: show progress and display results
             // displayAgents(agents);
@@ -919,7 +942,7 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            JobStatus agent = commander.terminateAgent(agentId);
+            RemoteJob agent = commander.terminateAgent(agentId);
             // todo: show progress and display result
             // displayAgents(ImmutableList.of(agent));
         }

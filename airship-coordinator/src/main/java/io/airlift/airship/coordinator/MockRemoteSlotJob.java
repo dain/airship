@@ -1,8 +1,8 @@
 package io.airlift.airship.coordinator;
 
 import com.google.common.collect.ImmutableList;
-import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.StateMachine.StateChangeListener;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.airship.shared.job.TaskStatus;
@@ -35,5 +35,10 @@ public class MockRemoteSlotJob
                 null,
                 0.0,
                 ImmutableList.<TaskStatus>of());
+    }
+
+    @Override
+    public void addStateChangeListener(StateChangeListener<SlotJobStatus> stateChangeListener)
+    {
     }
 }
