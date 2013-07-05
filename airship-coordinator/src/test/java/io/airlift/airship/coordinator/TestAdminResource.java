@@ -7,7 +7,6 @@ import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatus;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.units.Duration;
@@ -40,11 +39,13 @@ public class TestAdminResource
             throws Exception
     {
         coordinatorStatus = new CoordinatorStatus(UUID.randomUUID().toString(),
+                null,
                 CoordinatorLifecycleState.ONLINE,
                 "this-coordinator-instance-id",
                 URI.create("fake://coordinator/internal"),
                 URI.create("fake://coordinator/external"),
                 "/test/location",
+                null,
                 "this-coordinator-instance-type");
 
         repository = new TestingMavenRepository();
@@ -77,15 +78,15 @@ public class TestAdminResource
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
-        Iterable<CoordinatorStatusRepresentation> coordinators = (Iterable<CoordinatorStatusRepresentation>) response.getEntity();
+        Iterable<CoordinatorStatus> coordinators = (Iterable<CoordinatorStatus>) response.getEntity();
         assertEquals(Iterables.size(coordinators), 1);
-        CoordinatorStatusRepresentation actual = coordinators.iterator().next();
+        CoordinatorStatus actual = coordinators.iterator().next();
         assertEquals(actual.getCoordinatorId(), coordinatorStatus.getCoordinatorId());
         assertEquals(actual.getState(), CoordinatorLifecycleState.ONLINE);
         assertEquals(actual.getInstanceId(), coordinatorStatus.getInstanceId());
         assertEquals(actual.getLocation(), coordinatorStatus.getLocation());
         assertEquals(actual.getInstanceType(), coordinatorStatus.getInstanceType());
-        assertEquals(actual.getSelf(), coordinatorStatus.getInternalUri());
+        assertEquals(actual.getInternalUri(), coordinatorStatus.getInternalUri());
         assertEquals(actual.getExternalUri(), coordinatorStatus.getExternalUri());
     }
 
@@ -101,11 +102,13 @@ public class TestAdminResource
         String instanceType = "instance.type";
 
         CoordinatorStatus status = new CoordinatorStatus(coordinatorId,
+                null,
                 CoordinatorLifecycleState.ONLINE,
                 instanceId,
                 internalUri,
                 externalUri,
                 location,
+                null,
                 instanceType);
 
         // add the coordinator
@@ -118,22 +121,22 @@ public class TestAdminResource
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
         // locate the new coordinator
-        List<CoordinatorStatusRepresentation> coordinators = ImmutableList.copyOf((Iterable<CoordinatorStatusRepresentation>) response.getEntity());
-        CoordinatorStatusRepresentation actual = getNonMainCoordinator(coordinators);
+        List<CoordinatorStatus> coordinators = ImmutableList.copyOf((Iterable<CoordinatorStatus>) response.getEntity());
+        CoordinatorStatus actual = getNonMainCoordinator(coordinators);
 
         assertEquals(actual.getCoordinatorId(), coordinatorId);
         assertEquals(actual.getState(), CoordinatorLifecycleState.ONLINE);
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getInstanceType(), instanceType);
-        assertEquals(actual.getSelf(), internalUri);
+        assertEquals(actual.getInternalUri(), internalUri);
         assertEquals(actual.getExternalUri(), externalUri);
     }
 
-    private CoordinatorStatusRepresentation getNonMainCoordinator(List<CoordinatorStatusRepresentation> coordinators)
+    private CoordinatorStatus getNonMainCoordinator(List<CoordinatorStatus> coordinators)
     {
         assertEquals(coordinators.size(), 2);
-        CoordinatorStatusRepresentation actual;
+        CoordinatorStatus actual;
         if (coordinators.get(0).getInstanceId().equals(coordinatorStatus.getInstanceId())) {
             actual = coordinators.get(1);
         }
@@ -158,7 +161,7 @@ public class TestAdminResource
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
-        List<CoordinatorStatusRepresentation> coordinators = ImmutableList.copyOf((Iterable<CoordinatorStatusRepresentation>) response.getEntity());
+        List<CoordinatorStatus> coordinators = ImmutableList.copyOf((Iterable<CoordinatorStatus>) response.getEntity());
         assertEquals(coordinators.size(), 1);
         String instanceId = coordinators.get(0).getInstanceId();
         assertNotNull(instanceId);
@@ -166,7 +169,7 @@ public class TestAdminResource
         assertNotNull(location);
         assertEquals(coordinators.get(0).getInstanceType(), instanceType);
         assertNull(coordinators.get(0).getCoordinatorId());
-        assertNull(coordinators.get(0).getSelf());
+        assertNull(coordinators.get(0).getInternalUri());
         assertNull(coordinators.get(0).getExternalUri());
         assertEquals(coordinators.get(0).getState(), CoordinatorLifecycleState.PROVISIONING);
 
@@ -188,14 +191,14 @@ public class TestAdminResource
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
-        coordinators = ImmutableList.copyOf((Iterable<CoordinatorStatusRepresentation>) response.getEntity());
-        CoordinatorStatusRepresentation actual = getNonMainCoordinator(coordinators);
+        coordinators = ImmutableList.copyOf((Iterable<CoordinatorStatus>) response.getEntity());
+        CoordinatorStatus actual = getNonMainCoordinator(coordinators);
 
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getInstanceType(), instanceType);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getCoordinatorId(), coordinatorStatus.getCoordinatorId());
-        assertEquals(actual.getSelf(), coordinatorStatus.getInternalUri());
+        assertEquals(actual.getInternalUri(), coordinatorStatus.getInternalUri());
         assertEquals(actual.getExternalUri(), coordinatorStatus.getExternalUri());
         assertEquals(actual.getState(), CoordinatorLifecycleState.ONLINE);
     }

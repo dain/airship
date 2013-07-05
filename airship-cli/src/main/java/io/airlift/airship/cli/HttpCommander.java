@@ -13,7 +13,7 @@ import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.http.client.AsyncHttpClient;
@@ -48,7 +48,7 @@ public class HttpCommander implements Commander
     private static final JsonCodec<List<SlotStatus>> SLOTS_CODEC = JsonCodec.listJsonCodec(SlotStatus.class);
     private static final JsonCodec<Assignment> ASSIGNMENT_CODEC = JsonCodec.jsonCodec(Assignment.class);
 
-    private static final JsonCodec<List<CoordinatorStatusRepresentation>> COORDINATORS_CODEC = JsonCodec.listJsonCodec(CoordinatorStatusRepresentation.class);
+    private static final JsonCodec<List<CoordinatorStatus>> COORDINATORS_CODEC = JsonCodec.listJsonCodec(CoordinatorStatus.class);
     private static final JsonCodec<CoordinatorProvisioningRequest> COORDINATOR_PROVISIONING_CODEC = JsonCodec.jsonCodec(CoordinatorProvisioningRequest.class);
 
     private static final JsonCodec<AgentStatus> AGENT_CODEC = JsonCodec.jsonCodec(AgentStatus.class);
@@ -180,14 +180,14 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public List<CoordinatorStatusRepresentation> showCoordinators(CoordinatorFilter coordinatorFilter)
+    public List<CoordinatorStatus> showCoordinators(CoordinatorFilter coordinatorFilter)
     {
         URI uri = coordinatorFilter.toUri(uriBuilderFrom(coordinatorUri).replacePath("v1/admin/coordinator"));
         Request request = Request.Builder.prepareGet()
                 .setUri(uri)
                 .build();
 
-        List<CoordinatorStatusRepresentation> coordinators = client.execute(request, createJsonResponseHandler(COORDINATORS_CODEC));
+        List<CoordinatorStatus> coordinators = client.execute(request, createJsonResponseHandler(COORDINATORS_CODEC));
         return coordinators;
     }
 
@@ -222,7 +222,7 @@ public class HttpCommander implements Commander
         return HttpRemoteJob.createHttpRemoteJob(jobStatus, client, executor, jobStatusCodec);
     }
 
-    private List<CoordinatorStatusRepresentation> waitForCoordinatorsToStart(List<String> instanceIds)
+    private List<CoordinatorStatus> waitForCoordinatorsToStart(List<String> instanceIds)
     {
         for (int loop = 0; true; loop++) {
             try {
@@ -230,10 +230,10 @@ public class HttpCommander implements Commander
                 Request request = Request.Builder.prepareGet()
                         .setUri(uri)
                         .build();
-                List<CoordinatorStatusRepresentation> coordinators = client.execute(request, createJsonResponseHandler(COORDINATORS_CODEC));
+                List<CoordinatorStatus> coordinators = client.execute(request, createJsonResponseHandler(COORDINATORS_CODEC));
 
-                Map<String, CoordinatorStatusRepresentation> runningCoordinators = newHashMap();
-                for (CoordinatorStatusRepresentation coordinator : coordinators) {
+                Map<String, CoordinatorStatus> runningCoordinators = newHashMap();
+                for (CoordinatorStatus coordinator : coordinators) {
                     if (coordinator.getState() == CoordinatorLifecycleState.ONLINE) {
                         runningCoordinators.put(coordinator.getInstanceId(), coordinator);
                     }
@@ -259,7 +259,7 @@ public class HttpCommander implements Commander
                 .setUri(uri)
                 .build();
 
-        List<CoordinatorStatusRepresentation> coordinators = client.execute(request, createJsonResponseHandler(COORDINATORS_CODEC));
+        List<CoordinatorStatus> coordinators = client.execute(request, createJsonResponseHandler(COORDINATORS_CODEC));
         if (coordinators.isEmpty()) {
             return false;
         }

@@ -1,7 +1,7 @@
 package io.airlift.airship.cli;
 
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.SlotStatus;
 
 public interface OutputFormat
@@ -10,5 +10,5 @@ public interface OutputFormat
 
     void displayAgents(Iterable<AgentStatus> agents);
 
-    void displayCoordinators(Iterable<CoordinatorStatusRepresentation> coordinators);
+    void displayCoordinators(Iterable<CoordinatorStatus> coordinators);
 }

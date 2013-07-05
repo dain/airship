@@ -46,8 +46,10 @@ public class MockRemoteCoordinator
             return coordinatorStatus;
         } else {
             return new CoordinatorStatus(null,
+                    null,
                     CoordinatorLifecycleState.OFFLINE,
                     instanceId,
+                    null,
                     null,
                     null,
                     null,

@@ -35,7 +35,7 @@ import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
@@ -355,7 +355,7 @@ public class Airship
             outputFormat.displayAgents(agents);
         }
 
-        public void displayCoordinators(Iterable<CoordinatorStatusRepresentation> coordinators)
+        public void displayCoordinators(Iterable<CoordinatorStatus> coordinators)
         {
             outputFormat.displayCoordinators(coordinators);
         }
@@ -736,7 +736,7 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            List<CoordinatorStatusRepresentation> coordinators = commander.showCoordinators(coordinatorFilter);
+            List<CoordinatorStatus> coordinators = commander.showCoordinators(coordinatorFilter);
             displayCoordinators(coordinators);
         }
 

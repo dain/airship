@@ -1,0 +1,12 @@
+{
+    "coordinatorId": "44444444-4444-4444-4444-444444444444",
+    "shortCoordinatorId": "4444",
+    "state": "ONLINE",
+    "instanceId": "instanceId",
+    "internalUri": "internal://coordinator",
+    "externalUri": "external://coordinator",
+    "location": "/test/unknown/location",
+    "shortLocation": "/unknown/location",
+    "instanceType": "instance.type",
+    "version": "version"
+}

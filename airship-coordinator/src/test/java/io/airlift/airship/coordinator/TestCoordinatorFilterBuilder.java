@@ -19,11 +19,13 @@ import static org.testng.Assert.assertTrue;
 public class TestCoordinatorFilterBuilder
 {
     CoordinatorStatus status = new CoordinatorStatus("coordinator-id",
+            null,
             ONLINE,
             "coordinator-instance",
             URI.create("internal://10.0.0.1"),
             URI.create("external://localhost"),
             "/unknown/location",
+            null,
             "instance.type");
 
     private Predicate<CoordinatorStatus> buildFilter(String key, String value)

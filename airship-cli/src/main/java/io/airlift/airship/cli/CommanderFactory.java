@@ -233,11 +233,13 @@ public class CommanderFactory
 
         String coordinatorLocation = this.location == null ? Joiner.on('/').join("", "local", coordinatorId, "coordinator") : location;
         CoordinatorStatus coordinatorStatus = new CoordinatorStatus(coordinatorId,
+                null,
                 CoordinatorLifecycleState.ONLINE,
                 coordinatorId,
                 FAKE_LOCAL_URI,
                 FAKE_LOCAL_URI,
                 coordinatorLocation,
+                null,
                 instanceType);
 
         Coordinator coordinator = new Coordinator(coordinatorStatus,

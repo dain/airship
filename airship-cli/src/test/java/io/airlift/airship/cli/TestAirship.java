@@ -8,7 +8,7 @@ import io.airlift.airship.cli.Airship.AirshipCommanderCommand;
 import io.airlift.airship.coordinator.TestingMavenRepository;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.FileUtils;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
@@ -499,7 +499,7 @@ public class TestAirship
 
     private static class MockOutputFormat implements OutputFormat
     {
-        private List<CoordinatorStatusRepresentation> coordinators;
+        private List<CoordinatorStatus> coordinators;
         private List<AgentStatus> agents;
         private List<SlotStatus> slots;
 
@@ -511,7 +511,7 @@ public class TestAirship
         }
 
         @Override
-        public void displayCoordinators(Iterable<CoordinatorStatusRepresentation> coordinators)
+        public void displayCoordinators(Iterable<CoordinatorStatus> coordinators)
         {
             this.coordinators = ImmutableList.copyOf(coordinators);
         }

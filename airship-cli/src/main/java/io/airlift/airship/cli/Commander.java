@@ -3,7 +3,7 @@ package io.airlift.airship.cli;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.SlotStatus;
 
@@ -25,7 +25,7 @@ public interface Commander
 
     boolean ssh(SlotFilter slotFilter, String command);
 
-    List<CoordinatorStatusRepresentation> showCoordinators(CoordinatorFilter coordinatorFilter);
+    List<CoordinatorStatus> showCoordinators(CoordinatorFilter coordinatorFilter);
 
     RemoteJob provisionCoordinators(String coordinatorConfig,
             int coordinatorCount,

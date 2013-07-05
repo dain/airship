@@ -5,28 +5,28 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import org.fusesource.jansi.Ansi.Color;
 
 import static io.airlift.airship.cli.Ansi.colorize;
 
 public class CoordinatorRecord implements Record
 {
-    public static ImmutableList<Record> toCoordinatorRecords(Iterable<CoordinatorStatusRepresentation> coordinators)
+    public static ImmutableList<Record> toCoordinatorRecords(Iterable<CoordinatorStatus> coordinators)
     {
-        return ImmutableList.copyOf(Iterables.transform(coordinators, new Function<CoordinatorStatusRepresentation, Record>()
+        return ImmutableList.copyOf(Iterables.transform(coordinators, new Function<CoordinatorStatus, Record>()
         {
             @Override
-            public CoordinatorRecord apply(CoordinatorStatusRepresentation coordinator)
+            public CoordinatorRecord apply(CoordinatorStatus coordinator)
             {
                 return new CoordinatorRecord(coordinator);
             }
         }));
     }
 
-    private final CoordinatorStatusRepresentation coordinatorStatus;
+    private final CoordinatorStatus coordinatorStatus;
 
-    public CoordinatorRecord(CoordinatorStatusRepresentation coordinatorStatus)
+    public CoordinatorRecord(CoordinatorStatus coordinatorStatus)
     {
         Preconditions.checkNotNull(coordinatorStatus, "coordinatorStatus is null");
 
@@ -57,7 +57,7 @@ public class CoordinatorRecord implements Record
             case instanceType:
                 return coordinatorStatus.getInstanceType();
             case internalUri:
-                return coordinatorStatus.getSelf();
+                return coordinatorStatus.getInternalUri();
             case externalUri:
                 return coordinatorStatus.getExternalUri();
             default:

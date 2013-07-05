@@ -97,11 +97,13 @@ public class MockProvisioner implements Provisioner
             String location = String.format("/mock/%s/coordinator", coordinatorInstanceId);
 
             CoordinatorStatus coordinatorStatus = new CoordinatorStatus(null,
+                    null,
                     CoordinatorLifecycleState.PROVISIONING,
                     coordinatorInstanceId,
                     null,
                     null,
                     location,
+                    null,
                     instanceType);
 
             instances.add(new Instance(coordinatorStatus.getInstanceId(),
@@ -124,11 +126,13 @@ public class MockProvisioner implements Provisioner
         URI internalUri = URI.create("fake:/" + coordinatorId + "/internal");
         URI externalUri = URI.create("fake:/" + coordinatorId + "/external");
         CoordinatorStatus newCoordinatorStatus = new CoordinatorStatus(coordinatorId,
+                null,
                 CoordinatorLifecycleState.ONLINE,
                 instanceId,
                 internalUri,
                 externalUri,
                 coordinatorStatus.getLocation(),
+                null,
                 coordinatorStatus.getInstanceType());
 
         coordinators.put(instanceId, newCoordinatorStatus);

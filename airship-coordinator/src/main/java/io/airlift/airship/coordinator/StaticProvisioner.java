@@ -13,7 +13,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.http.client.Request;
 import io.airlift.http.client.Request.Builder;
@@ -55,7 +55,7 @@ public class StaticProvisioner
     private final URI agentsUri;
     private final NodeInfo nodeInfo;
     private final AsyncHttpClient httpClient;
-    private final JsonCodec<CoordinatorStatusRepresentation> coordinatorCodec;
+    private final JsonCodec<CoordinatorStatus> coordinatorCodec;
     private final JsonCodec<AgentStatus> agentCodec;
 
     private final AtomicBoolean coordinatorsResourceIsUp = new AtomicBoolean(true);
@@ -66,7 +66,7 @@ public class StaticProvisioner
     public StaticProvisioner(StaticProvisionerConfig config,
             NodeInfo nodeInfo,
             @Global AsyncHttpClient httpClient,
-            JsonCodec<CoordinatorStatusRepresentation> coordinatorCodec,
+            JsonCodec<CoordinatorStatus> coordinatorCodec,
             JsonCodec<AgentStatus> agentCodec)
     {
         this(config.getCoordinatorsUri(),
@@ -81,7 +81,7 @@ public class StaticProvisioner
             URI agentsUri,
             NodeInfo nodeInfo,
             AsyncHttpClient httpClient,
-            JsonCodec<CoordinatorStatusRepresentation> coordinatorCodec,
+            JsonCodec<CoordinatorStatus> coordinatorCodec,
             JsonCodec<AgentStatus> agentCodec)
     {
         Preconditions.checkNotNull(coordinatorsUri, "coordinatorsUri is null");
@@ -121,12 +121,12 @@ public class StaticProvisioner
 
                 String hostAndPort = uri.getHost() + ":" + uri.getPort();
                 try {
-                    CoordinatorStatusRepresentation coordinator = httpClient.execute(request, createJsonResponseHandler(coordinatorCodec));
+                    CoordinatorStatus coordinator = httpClient.execute(request, createJsonResponseHandler(coordinatorCodec));
 
                     return new Instance(coordinator.getInstanceId(),
                             firstNonNull(coordinator.getInstanceType(), "unknown"),
                             coordinator.getLocation(),
-                            coordinator.getSelf(),
+                            coordinator.getInternalUri(),
                             coordinator.getExternalUri());
                 }
                 catch (Exception e) {

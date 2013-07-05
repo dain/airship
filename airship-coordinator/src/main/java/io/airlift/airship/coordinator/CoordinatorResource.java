@@ -16,7 +16,6 @@ package io.airlift.airship.coordinator;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import io.airlift.airship.shared.CoordinatorStatus;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -42,7 +41,6 @@ public class CoordinatorResource
     public Response getAllSlotsStatus()
     {
         CoordinatorStatus coordinatorStatus = coordinator.status();
-        CoordinatorStatusRepresentation coordinatorStatusRepresentation = CoordinatorStatusRepresentation.from(coordinatorStatus);
-        return Response.ok(coordinatorStatusRepresentation).build();
+        return Response.ok(coordinatorStatus).build();
     }
 }

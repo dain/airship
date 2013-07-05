@@ -42,11 +42,13 @@ public class TestCoordinator
             throws Exception
     {
         coordinatorStatus = new CoordinatorStatus(UUID.randomUUID().toString(),
+                null,
                 CoordinatorLifecycleState.ONLINE,
                 "this-coordinator-instance-id",
                 URI.create("fake://coordinator/internal"),
                 URI.create("fake://coordinator/external"),
                 "/local/location",
+                null,
                 "this-coordinator-instance-type");
 
         repository = new TestingMavenRepository();
@@ -113,11 +115,13 @@ public class TestCoordinator
 
         // add the coordinator to the provisioner
         CoordinatorStatus status = new CoordinatorStatus(coordinatorId,
+                null,
                 CoordinatorLifecycleState.ONLINE,
                 instanceId,
                 internalUri,
                 externalUri,
                 location,
+                null,
                 instanceType);
         provisioner.addCoordinators(status);
 

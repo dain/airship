@@ -51,7 +51,7 @@ import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.HttpUriBuilder;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Installation;
@@ -130,7 +130,7 @@ public class TestServerIntegration
     private Slot appleSlot2;
     private Slot bananaSlot;
 
-    private final JsonCodec<List<CoordinatorStatusRepresentation>> coordinatorStatusesCodec = listJsonCodec(CoordinatorStatusRepresentation.class);
+    private final JsonCodec<List<CoordinatorStatus>> coordinatorStatusesCodec = listJsonCodec(CoordinatorStatus.class);
     private final JsonCodec<List<AgentStatus>> agentStatusesCodec = listJsonCodec(AgentStatus.class);
     private final JsonCodec<List<SlotStatus>> slotStatusesCodec = listJsonCodec(SlotStatus.class);
     private final JsonCodec<CoordinatorProvisioningRequest> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRequest.class);
@@ -315,15 +315,15 @@ public class TestServerIntegration
                 .setUri(coordinatorUriBuilder().appendPath("/v1/admin/coordinator").build())
                 .build();
 
-        List<CoordinatorStatusRepresentation> coordinators = httpClient.execute(request, createJsonResponseHandler(coordinatorStatusesCodec, Status.OK.getStatusCode()));
-        CoordinatorStatusRepresentation actual = getNonMainCoordinator(coordinators);
+        List<CoordinatorStatus> coordinators = httpClient.execute(request, createJsonResponseHandler(coordinatorStatusesCodec, Status.OK.getStatusCode()));
+        CoordinatorStatus actual = getNonMainCoordinator(coordinators);
 
         assertEquals(actual.getCoordinatorId(), coordinatorServer.getCoordinator().status().getCoordinatorId());
         assertEquals(actual.getState(), CoordinatorLifecycleState.ONLINE);
         assertEquals(actual.getInstanceId(), coordinatorServer.getInstance().getInstanceId());
         assertEquals(actual.getLocation(), coordinatorServer.getInstance().getLocation());
         assertEquals(actual.getInstanceType(), coordinatorServer.getInstance().getInstanceType());
-        assertEquals(actual.getSelf(), coordinatorServer.getInstance().getInternalUri());
+        assertEquals(actual.getInternalUri(), coordinatorServer.getInstance().getInternalUri());
         assertEquals(actual.getExternalUri(), coordinatorServer.getInstance().getExternalUri());
     }
 
@@ -339,7 +339,7 @@ public class TestServerIntegration
                 .setHeader(CONTENT_TYPE, APPLICATION_JSON)
                 .setBodyGenerator(jsonBodyGenerator(coordinatorProvisioningCodec, coordinatorProvisioningRequest))
                 .build();
-        List<CoordinatorStatusRepresentation> coordinators = httpClient.execute(request, createJsonResponseHandler(coordinatorStatusesCodec, Status.OK.getStatusCode()));
+        List<CoordinatorStatus> coordinators = httpClient.execute(request, createJsonResponseHandler(coordinatorStatusesCodec, Status.OK.getStatusCode()));
 
         assertEquals(coordinators.size(), 1);
         String instanceId = coordinators.get(0).getInstanceId();
@@ -348,7 +348,7 @@ public class TestServerIntegration
         assertNotNull(location);
         assertEquals(coordinators.get(0).getInstanceType(), instanceType);
         assertNull(coordinators.get(0).getCoordinatorId());
-        assertNull(coordinators.get(0).getSelf());
+        assertNull(coordinators.get(0).getInternalUri());
         assertNull(coordinators.get(0).getExternalUri());
         assertEquals(coordinators.get(0).getState(), CoordinatorLifecycleState.PROVISIONING);
 
@@ -371,21 +371,21 @@ public class TestServerIntegration
                 .build();
 
         coordinators = httpClient.execute(request, createJsonResponseHandler(coordinatorStatusesCodec, Status.OK.getStatusCode()));
-        CoordinatorStatusRepresentation actual = getNonMainCoordinator(coordinators);
+        CoordinatorStatus actual = getNonMainCoordinator(coordinators);
 
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getInstanceType(), instanceType);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getCoordinatorId(), coordinatorServer.getCoordinator().status().getCoordinatorId());
-        assertEquals(actual.getSelf(), coordinatorServer.getInstance().getInternalUri());
+        assertEquals(actual.getInternalUri(), coordinatorServer.getInstance().getInternalUri());
         assertEquals(actual.getExternalUri(), coordinatorServer.getInstance().getExternalUri());
         assertEquals(actual.getState(), CoordinatorLifecycleState.ONLINE);
     }
 
-    private CoordinatorStatusRepresentation getNonMainCoordinator(List<CoordinatorStatusRepresentation> coordinators)
+    private CoordinatorStatus getNonMainCoordinator(List<CoordinatorStatus> coordinators)
     {
         assertEquals(coordinators.size(), 2);
-        CoordinatorStatusRepresentation actual;
+        CoordinatorStatus actual;
         if (coordinators.get(0).getInstanceId().equals(coordinator.status().getInstanceId())) {
             actual = coordinators.get(1);
         }

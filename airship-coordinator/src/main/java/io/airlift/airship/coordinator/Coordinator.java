@@ -115,10 +115,12 @@ public class Coordinator
     {
         this(
                 new CoordinatorStatus(nodeInfo.getInstanceId(),
+                        nodeInfo.getInstanceId(),
                         CoordinatorLifecycleState.ONLINE,
                         nodeInfo.getInstanceId(),
                         httpServerInfo.getHttpUri(),
                         httpServerInfo.getHttpExternalUri(),
+                        nodeInfo.getLocation(),
                         nodeInfo.getLocation(),
                         null),
                 remoteCoordinatorFactory,

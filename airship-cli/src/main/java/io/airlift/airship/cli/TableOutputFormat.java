@@ -2,7 +2,7 @@ package io.airlift.airship.cli;
 
 import com.google.common.collect.Iterables;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.SlotStatus;
 
 import static io.airlift.airship.cli.AgentRecord.toAgentRecords;
@@ -55,7 +55,7 @@ public class TableOutputFormat implements OutputFormat
     }
 
     @Override
-    public void displayCoordinators(Iterable<CoordinatorStatusRepresentation> coordinators)
+    public void displayCoordinators(Iterable<CoordinatorStatus> coordinators)
     {
         if (Iterables.isEmpty(coordinators)) {
             System.out.println("No coordinators match the provided filters.");

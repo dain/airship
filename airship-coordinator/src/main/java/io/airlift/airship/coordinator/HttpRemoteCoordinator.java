@@ -6,7 +6,6 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.airship.shared.CoordinatorStatus;
-import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.http.client.Request;
 import io.airlift.json.JsonCodec;
@@ -23,7 +22,7 @@ import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandl
 public class HttpRemoteCoordinator
         implements RemoteCoordinator
 {
-    private final JsonCodec<CoordinatorStatusRepresentation> coordinatorStatusCodec;
+    private final JsonCodec<CoordinatorStatus> coordinatorStatusCodec;
 
     @GuardedBy("this")
     private CoordinatorStatus coordinatorStatus;
@@ -34,7 +33,7 @@ public class HttpRemoteCoordinator
     public HttpRemoteCoordinator(CoordinatorStatus coordinatorStatus,
             String environment,
             AsyncHttpClient httpClient,
-            JsonCodec<CoordinatorStatusRepresentation> coordinatorStatusCodec)
+            JsonCodec<CoordinatorStatus> coordinatorStatusCodec)
     {
         Preconditions.checkNotNull(coordinatorStatus, "coordinatorStatus is null");
         Preconditions.checkNotNull(environment, "environment is null");
@@ -69,14 +68,14 @@ public class HttpRemoteCoordinator
         Request request = Request.Builder.prepareGet()
                 .setUri(uriBuilderFrom(internalUri).replacePath("/v1/coordinator/").build())
                 .build();
-        CheckedFuture<CoordinatorStatusRepresentation, RuntimeException> future = httpClient.executeAsync(request, createJsonResponseHandler(coordinatorStatusCodec));
-        Futures.addCallback(future, new FutureCallback<CoordinatorStatusRepresentation>()
+        CheckedFuture<CoordinatorStatus, RuntimeException> future = httpClient.executeAsync(request, createJsonResponseHandler(coordinatorStatusCodec));
+        Futures.addCallback(future, new FutureCallback<CoordinatorStatus>()
         {
             @Override
-            public void onSuccess(CoordinatorStatusRepresentation result)
+            public void onSuccess(CoordinatorStatus result)
             {
                 // todo deal with out of order responses
-                setStatus(result.toCoordinatorStatus(coordinatorStatus.getInstanceId(), coordinatorStatus.getInstanceType()));
+                setStatus(result.changeInstance(coordinatorStatus.getInstanceId(), coordinatorStatus.getInstanceType()));
                 failureCount.set(0);
             }
 
