@@ -29,16 +29,15 @@ import io.airlift.airship.coordinator.job.LifecycleRequest;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
+import io.airlift.airship.shared.ExpectedSlotStatus;
 import io.airlift.airship.shared.HttpUriBuilder;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.configuration.ConfigurationFactory;
 import io.airlift.configuration.ConfigurationModule;
 import io.airlift.event.client.EventModule;
@@ -58,6 +57,7 @@ import org.testng.annotations.Test;
 
 import javax.inject.Singleton;
 import javax.ws.rs.core.Response.Status;
+
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +75,7 @@ import static io.airlift.airship.shared.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.airship.shared.IdAndVersion.forIds;
 import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
-import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
+import static io.airlift.airship.shared.SlotStatus.shortenSlotStatus;
 import static io.airlift.airship.shared.Strings.shortestUniquePrefix;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
@@ -98,8 +98,8 @@ public class TestCoordinatorServer
     private InMemoryStateManager stateManager;
 
     private final JsonCodec<List<CoordinatorStatusRepresentation>> coordinatorStatusesCodec = listJsonCodec(CoordinatorStatusRepresentation.class);
-    private final JsonCodec<List<AgentStatusRepresentation>> agentStatusesCodec = listJsonCodec(AgentStatusRepresentation.class);
-    private final JsonCodec<List<SlotStatusRepresentation>> slotStatusesCodec = listJsonCodec(SlotStatusRepresentation.class);
+    private final JsonCodec<List<AgentStatus>> agentStatusesCodec = listJsonCodec(AgentStatus.class);
+    private final JsonCodec<List<SlotStatus>> slotStatusesCodec = listJsonCodec(SlotStatus.class);
     private final JsonCodec<CoordinatorProvisioningRepresentation> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRepresentation.class);
     private final JsonCodec<AgentProvisioningRepresentation> agentProvisioningCodec = jsonCodec(AgentProvisioningRepresentation.class);
 
@@ -198,35 +198,61 @@ public class TestCoordinatorServer
     private void initializeOneAgent()
     {
         apple1SlotId = UUID.randomUUID();
-        SlotStatus appleSlotStatus1 = createSlotStatus(apple1SlotId,
+        SlotStatus appleSlotStatus1 = new SlotStatus(
+                apple1SlotId,
+                apple1SlotId.toString(),
                 URI.create("fake://appleServer1/v1/agent/slot/apple1"),
                 URI.create("fake://appleServer1/v1/agent/slot/apple1"),
                 "instance",
+                "/location",
                 "/location",
                 STOPPED,
                 APPLE_ASSIGNMENT,
                 "/apple1",
-                ImmutableMap.<String, Integer>of());
+                ImmutableMap.<String, Integer>of(),
+                STOPPED,
+                APPLE_ASSIGNMENT,
+                null,
+                SlotStatus.createSlotVersion(apple1SlotId, STOPPED, APPLE_ASSIGNMENT));
+        stateManager.setExpectedState(new ExpectedSlotStatus(appleSlotStatus1));
+
         apple2SlotId = UUID.randomUUID();
-        SlotStatus appleSlotStatus2 = createSlotStatus(apple2SlotId,
+        SlotStatus appleSlotStatus2 = new SlotStatus(
+                apple2SlotId,
+                apple2SlotId.toString(),
                 URI.create("fake://appleServer2/v1/agent/slot/apple1"),
                 URI.create("fake://appleServer2/v1/agent/slot/apple1"),
                 "instance",
+                "/location",
                 "/location",
                 STOPPED,
                 APPLE_ASSIGNMENT,
                 "/apple2",
-                ImmutableMap.<String, Integer>of());
+                ImmutableMap.<String, Integer>of(),
+                STOPPED,
+                APPLE_ASSIGNMENT,
+                null,
+                SlotStatus.createSlotVersion(apple2SlotId, STOPPED, APPLE_ASSIGNMENT));
+        stateManager.setExpectedState(new ExpectedSlotStatus(appleSlotStatus2));
+
         bananaSlotId = UUID.randomUUID();
-        SlotStatus bananaSlotStatus = createSlotStatus(bananaSlotId,
+        SlotStatus bananaSlotStatus = new SlotStatus(
+                bananaSlotId,
+                bananaSlotId.toString(),
                 URI.create("fake://bananaServer/v1/agent/slot/banana"),
                 URI.create("fake://bananaServer/v1/agent/slot/banana"),
                 "instance",
                 "/location",
+                "/location",
                 STOPPED,
                 BANANA_ASSIGNMENT,
                 "/banana",
-                ImmutableMap.<String, Integer>of());
+                ImmutableMap.<String, Integer>of(),
+                STOPPED,
+                BANANA_ASSIGNMENT,
+                null,
+                SlotStatus.createSlotVersion(bananaSlotId, STOPPED, BANANA_ASSIGNMENT));
+        stateManager.setExpectedState(new ExpectedSlotStatus(bananaSlotStatus));
 
         agentId = UUID.randomUUID().toString();
         AgentStatus agentStatus = new AgentStatus(agentId,
@@ -242,7 +268,7 @@ public class TestCoordinatorServer
         provisioner.addAgents(agentStatus);
         coordinator.updateAllAgents();
 
-        stateManager.clearAll();
+//        stateManager.clearAll();
     }
 
     @AfterClass
@@ -368,7 +394,7 @@ public class TestCoordinatorServer
                 .setUri(coordinatorUriBuilder().appendPath("/v1/admin/agent").build())
                 .build();
 
-        List<AgentStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
+        List<AgentStatus> actual = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
         assertEquals(actual.size(), 0);
     }
 
@@ -402,16 +428,16 @@ public class TestCoordinatorServer
                 .setUri(coordinatorUriBuilder().appendPath("/v1/admin/agent").build())
                 .build();
 
-        List<AgentStatusRepresentation> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
+        List<AgentStatus> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
         assertEquals(agents.size(), 1);
 
-        AgentStatusRepresentation actual = agents.get(0);
+        AgentStatus actual = agents.get(0);
         assertEquals(actual.getAgentId(), agentId);
         assertEquals(actual.getState(), AgentLifecycleState.ONLINE);
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getInstanceType(), instanceType);
-        assertEquals(actual.getSelf(), internalUri);
+        assertEquals(actual.getInternalUri(), internalUri);
         assertEquals(actual.getExternalUri(), externalUri);
         assertEquals(actual.getResources(), resources);
     }
@@ -428,7 +454,7 @@ public class TestCoordinatorServer
                 .setHeader(CONTENT_TYPE, APPLICATION_JSON)
                 .setBodyGenerator(jsonBodyGenerator(agentProvisioningCodec, agentProvisioningRepresentation))
                 .build();
-        List<AgentStatusRepresentation> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
+        List<AgentStatus> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
 
         assertEquals(agents.size(), 1);
         String instanceId = agents.get(0).getInstanceId();
@@ -437,7 +463,7 @@ public class TestCoordinatorServer
         assertNotNull(location);
         assertEquals(agents.get(0).getInstanceType(), instanceType);
         assertNull(agents.get(0).getAgentId());
-        assertNull(agents.get(0).getSelf());
+        assertNull(agents.get(0).getInternalUri());
         assertNull(agents.get(0).getExternalUri());
         assertEquals(agents.get(0).getState(), AgentLifecycleState.PROVISIONING);
 
@@ -460,12 +486,12 @@ public class TestCoordinatorServer
         agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
         assertEquals(agents.size(), 1);
 
-        AgentStatusRepresentation actual = agents.get(0);
+        AgentStatus actual = agents.get(0);
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getInstanceType(), instanceType);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getAgentId(), expectedAgentStatus.getAgentId());
-        assertEquals(actual.getSelf(), expectedAgentStatus.getInternalUri());
+        assertEquals(actual.getInternalUri(), expectedAgentStatus.getInternalUri());
         assertEquals(actual.getExternalUri(), expectedAgentStatus.getExternalUri());
         assertEquals(actual.getState(), AgentLifecycleState.ONLINE);
     }
@@ -479,20 +505,20 @@ public class TestCoordinatorServer
         Request request = Request.Builder.prepareGet()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot").addParameter("name", "*").build())
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
+        List<SlotStatus> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
 
         int prefixSize = shortestUniquePrefix(asList(
-                agentStatus.getSlotStatus(apple1SlotId).getId().toString(),
-                agentStatus.getSlotStatus(apple2SlotId).getId().toString(),
-                agentStatus.getSlotStatus(bananaSlotId).getId().toString()),
+                agentStatus.getSlot(apple1SlotId).getId().toString(),
+                agentStatus.getSlot(apple2SlotId).getId().toString(),
+                agentStatus.getSlot(bananaSlotId).getId().toString()),
                 MIN_PREFIX_SIZE);
 
         assertEqualsNoOrder(actual, ImmutableList.of(
-                SlotStatusRepresentation.from(agentStatus.getSlotStatus(apple1SlotId), prefixSize, MOCK_REPO),
-                SlotStatusRepresentation.from(agentStatus.getSlotStatus(apple2SlotId), prefixSize, MOCK_REPO),
-                SlotStatusRepresentation.from(agentStatus.getSlotStatus(bananaSlotId), prefixSize, MOCK_REPO)));
+                shortenSlotStatus(agentStatus.getSlot(apple1SlotId), prefixSize, 0, MOCK_REPO),
+                shortenSlotStatus(agentStatus.getSlot(apple2SlotId), prefixSize, 0, MOCK_REPO),
+                shortenSlotStatus(agentStatus.getSlot(bananaSlotId), prefixSize, 0, MOCK_REPO)));
     }
 
     @Test
@@ -511,9 +537,9 @@ public class TestCoordinatorServer
         httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        SlotStatus apple1Status = agentStatus.getSlot(apple1SlotId);
+        SlotStatus apple2Status = agentStatus.getSlot(apple2SlotId);
+        SlotStatus bananaStatus = agentStatus.getSlot(bananaSlotId);
 
         assertEquals(apple1Status.getState(), STOPPED);
         assertEquals(apple2Status.getState(), STOPPED);
@@ -538,9 +564,9 @@ public class TestCoordinatorServer
 
         httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
-        SlotStatus apple1StatusActual = coordinator.getAgentByAgentId(agentId).getSlotStatus(apple1SlotId);
-        SlotStatus apple2StatusActual = coordinator.getAgentByAgentId(agentId).getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = coordinator.getAgentByAgentId(agentId).getSlotStatus(bananaSlotId);
+        SlotStatus apple1StatusActual = coordinator.getAgentByAgentId(agentId).getSlot(apple1SlotId);
+        SlotStatus apple2StatusActual = coordinator.getAgentByAgentId(agentId).getSlot(apple2SlotId);
+        SlotStatus bananaStatus = coordinator.getAgentByAgentId(agentId).getSlot(bananaSlotId);
 
         assertNull(apple1StatusActual);
         assertNull(apple2StatusActual);
@@ -562,9 +588,9 @@ public class TestCoordinatorServer
         httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        SlotStatus apple1Status = agentStatus.getSlot(apple1SlotId);
+        SlotStatus apple2Status = agentStatus.getSlot(apple2SlotId);
+        SlotStatus bananaStatus = agentStatus.getSlot(bananaSlotId);
 
         assertEquals(apple1Status.getState(), RUNNING);
         assertEquals(apple2Status.getState(), RUNNING);
@@ -586,9 +612,9 @@ public class TestCoordinatorServer
         httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        SlotStatus apple1Status = agentStatus.getSlot(apple1SlotId);
+        SlotStatus apple2Status = agentStatus.getSlot(apple2SlotId);
+        SlotStatus bananaStatus = agentStatus.getSlot(bananaSlotId);
 
         assertEquals(apple1Status.getState(), RUNNING);
         assertEquals(apple2Status.getState(), RUNNING);
@@ -612,9 +638,9 @@ public class TestCoordinatorServer
         httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        SlotStatus apple1Status = agentStatus.getSlot(apple1SlotId);
+        SlotStatus apple2Status = agentStatus.getSlot(apple2SlotId);
+        SlotStatus bananaStatus = agentStatus.getSlot(bananaSlotId);
 
         assertEquals(apple1Status.getState(), STOPPED);
         assertEquals(apple2Status.getState(), STOPPED);
@@ -638,9 +664,9 @@ public class TestCoordinatorServer
         httpClient.execute(request, createJsonResponseHandler(jobStatusCodec, Status.OK.getStatusCode(), Status.CREATED.getStatusCode()));
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        SlotStatus apple1Status = agentStatus.getSlot(apple1SlotId);
+        SlotStatus apple2Status = agentStatus.getSlot(apple2SlotId);
+        SlotStatus bananaStatus = agentStatus.getSlot(bananaSlotId);
 
         assertEquals(apple1Status.getState(), STOPPED);
         assertEquals(apple2Status.getState(), STOPPED);

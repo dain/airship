@@ -458,7 +458,7 @@ public class AgentFilterBuilder
             if (agentStatus == null) {
                 return false;
             }
-            for (SlotStatus slotStatus : agentStatus.getSlotStatuses()) {
+            for (SlotStatus slotStatus : agentStatus.getSlots()) {
                 if (predicate.apply(slotStatus)) {
                     return true;
                 }
@@ -543,7 +543,7 @@ public class AgentFilterBuilder
 
             // Constraints: normally we only allow only instance of a binary+config on each agent
             if (!allowDuplicateInstallationsOnAnAgent) {
-                for (SlotStatus slot : status.getSlotStatuses()) {
+                for (SlotStatus slot : status.getSlots()) {
                     if (repository.binaryEqualsIgnoreVersion(assignment.getBinary(), slot.getAssignment().getBinary()) &&
                             repository.configEqualsIgnoreVersion(assignment.getConfig(), slot.getAssignment().getConfig())) {
                         return false;

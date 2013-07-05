@@ -8,14 +8,12 @@ import io.airlift.airship.coordinator.Coordinator;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.discovery.client.ServiceDescriptor;
 import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
 import io.airlift.json.JsonCodec;
@@ -29,9 +27,9 @@ import java.util.UUID;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Lists.transform;
 import static io.airlift.airship.shared.AgentStatus.idGetter;
-import static io.airlift.airship.shared.AgentStatusRepresentation.fromAgentStatus;
+import static io.airlift.airship.shared.AgentStatus.shortenAgentStatus;
 import static io.airlift.airship.shared.CoordinatorStatusRepresentation.fromCoordinatorStatus;
-import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
+import static io.airlift.airship.shared.SlotStatus.shortenSlotStatus;
 
 public class LocalCommander implements Commander
 {
@@ -53,7 +51,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public List<SlotStatusRepresentation> show(SlotFilter slotFilter)
+    public List<SlotStatus> show(SlotFilter slotFilter)
     {
         List<SlotStatus> allSlotStatus = coordinator.getAllSlotsStatus();
         List<UUID> uuids = transform(allSlotStatus, SlotStatus.uuidGetter());
@@ -65,7 +63,7 @@ public class LocalCommander implements Commander
         // update just in case something changed
         updateServiceInventory();
 
-        return transform(slots, fromSlotStatus(coordinator.getAllSlotsStatus(), repository));
+        return transform(slots, shortenSlotStatus(coordinator.getAllSlotsStatus(), repository));
     }
 
     @Override
@@ -152,7 +150,7 @@ public class LocalCommander implements Commander
 
         // execute the command against one of the slots
         Collections.shuffle(slots);
-        Exec.execLocal(SlotStatusRepresentation.from(slots.get(0)), command);
+        Exec.execLocal(slots.get(0), command);
         return true;
     }
 
@@ -188,7 +186,7 @@ public class LocalCommander implements Commander
     }
 
     @Override
-    public List<AgentStatusRepresentation> showAgents(AgentFilter agentFilter)
+    public List<AgentStatus> showAgents(AgentFilter agentFilter)
     {
         Predicate<AgentStatus> agentPredicate = agentFilter.toAgentPredicate(
                 transform(coordinator.getAgents(), idGetter()),
@@ -199,7 +197,7 @@ public class LocalCommander implements Commander
 
         // update just in case something changed
         updateServiceInventory();
-        return transform(agentStatuses, fromAgentStatus(coordinator.getAgents(), repository));
+        return transform(agentStatuses, shortenAgentStatus(coordinator.getAgents()));
     }
 
     @Override

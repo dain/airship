@@ -25,73 +25,68 @@ import java.util.UUID;
 
 import static io.airlift.airship.shared.AgentLifecycleState.ONLINE;
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
+import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT_2;
 import static io.airlift.airship.shared.AssignmentHelper.BANANA_ASSIGNMENT;
+import static io.airlift.airship.shared.SlotLifecycleState.RUNNING;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static org.testng.Assert.assertEquals;
 
 public class TestAgentStatusRepresentation
 {
-    private final JsonCodec<AgentStatusRepresentation> codec = jsonCodec(AgentStatusRepresentation.class);
+    private final JsonCodec<AgentStatus> codec = jsonCodec(AgentStatus.class);
 
-    private final AgentStatusRepresentation expected = new AgentStatusRepresentation(
+    private final AgentStatus expected = new AgentStatus(
             "44444444-4444-4444-4444-444444444444",
             "4444",
-            "instanceId",
             ONLINE,
+            "instanceId",
             URI.create("internal://agent"),
             URI.create("external://agent"),
             "/test/unknown/location",
             "/unknown/location",
             "instance.type",
             ImmutableList.of(
-                    new SlotStatusRepresentation(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                            null,
+                    new SlotStatus(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                            "aaaa",
                             URI.create("internal://apple"),
                             URI.create("external://apple"),
                             "instance",
                             "/test/location/apple",
                             "/location/apple",
-                            APPLE_ASSIGNMENT.getBinary(),
-                            APPLE_ASSIGNMENT.getBinary(),
-                            APPLE_ASSIGNMENT.getConfig(),
-                            APPLE_ASSIGNMENT.getConfig(),
-                            STOPPED.toString(),
-                            "abc",
-                            null,
+                            STOPPED,
+                            APPLE_ASSIGNMENT,
                             "/apple",
                             ImmutableMap.<String, Integer>of(),
-                            null,
-                            null,
-                            null),
-                    new SlotStatusRepresentation(UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
-                            null,
+                            RUNNING,
+                            APPLE_ASSIGNMENT_2,
+                            "apple status message",
+                            "apple version"),
+                    new SlotStatus(UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                            "bbbb",
                             URI.create("internal://banana"),
                             URI.create("external://banana"),
                             "instance",
                             "/test/location/banana",
                             "/location/banana",
-                            BANANA_ASSIGNMENT.getBinary(),
-                            BANANA_ASSIGNMENT.getBinary(),
-                            BANANA_ASSIGNMENT.getConfig(),
-                            BANANA_ASSIGNMENT.getConfig(),
-                            STOPPED.toString(),
-                            "abc",
-                            null,
+                            STOPPED,
+                            BANANA_ASSIGNMENT,
                             "/banana",
                             ImmutableMap.<String, Integer>of(),
-                            null,
-                            null,
-                            null)),
+                            STOPPED,
+                            BANANA_ASSIGNMENT,
+                            "banana status message",
+                            "banana version")),
             ImmutableMap.of("cpu", 8, "memory", 1024),
-            "agent-version"
+            "version"
     );
 
     @Test
     public void testJsonRoundTrip()
     {
         String json = codec.toJson(expected);
-        AgentStatusRepresentation actual = codec.fromJson(json);
+        System.out.println(json);
+        AgentStatus actual = codec.fromJson(json);
         assertEquals(actual, expected);
     }
 
@@ -100,13 +95,13 @@ public class TestAgentStatusRepresentation
             throws Exception
     {
         String json = Resources.toString(Resources.getResource("agent-status.json"), Charsets.UTF_8);
-        AgentStatusRepresentation actual = codec.fromJson(json);
+        AgentStatus actual = codec.fromJson(json);
 
         assertEquals(actual, expected);
         assertEquals(actual.getAgentId(), expected.getAgentId());
         assertEquals(actual.getShortAgentId(), expected.getShortAgentId());
         assertEquals(actual.getInstanceId(), expected.getInstanceId());
-        assertEquals(actual.getSelf(), expected.getSelf());
+        assertEquals(actual.getInternalUri(), expected.getInternalUri());
         assertEquals(actual.getState(), expected.getState());
         assertEquals(actual.getInstanceType(), expected.getInstanceType());
         assertEquals(actual.getResources(), expected.getResources());

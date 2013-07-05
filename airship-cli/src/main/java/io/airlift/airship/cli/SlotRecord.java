@@ -3,39 +3,39 @@ package io.airlift.airship.cli;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import org.fusesource.jansi.Ansi.Color;
-
-import java.util.List;
 
 import static io.airlift.airship.cli.Ansi.colorize;
 
 public class SlotRecord implements Record
 {
 
-    public static ImmutableList<Record> toSlotRecords(Iterable<SlotStatusRepresentation> slots)
+    public static ImmutableList<Record> toSlotRecords(Iterable<SlotStatus> slots)
     {
-        return ImmutableList.copyOf(Iterables.transform(slots, new Function<SlotStatusRepresentation, Record>()
+        return ImmutableList.copyOf(Iterables.transform(slots, new Function<SlotStatus, Record>()
         {
             @Override
-            public SlotRecord apply(SlotStatusRepresentation slot)
+            public SlotRecord apply(SlotStatus slot)
             {
                 return new SlotRecord(slot);
             }
         }));
     }
 
-    private final SlotStatusRepresentation slotStatus;
+    private final SlotStatus slotStatus;
 
-    public SlotRecord(SlotStatusRepresentation statusRepresentation)
+    public SlotRecord(SlotStatus statusRepresentation)
     {
         this.slotStatus = statusRepresentation;
     }
 
     public String getObjectValue(Column column)
     {
+        Assignment assignment = slotStatus.getAssignment();
+        Assignment expectedAssignment = slotStatus.getExpectedAssignment();
         switch (column) {
             case shortId:
                 return slotStatus.getShortId();
@@ -50,25 +50,25 @@ public class SlotRecord implements Record
             case externalHost:
                 return slotStatus.getExternalHost();
             case status:
-                return slotStatus.getStatus();
+                return slotStatus.getState() == null ? null : slotStatus.getState().toString();
             case location:
                 return slotStatus.getLocation();
             case shortLocation:
                 return slotStatus.getShortLocation();
             case binary:
-                return slotStatus.getBinary();
+                return assignment == null ? null : assignment.getBinary();
             case shortBinary:
-                return slotStatus.getShortBinary();
+                return assignment == null ? null : assignment.getShortBinary();
             case config:
-                return slotStatus.getConfig();
+                return assignment == null ? null : assignment.getConfig();
             case shortConfig:
-                return slotStatus.getShortConfig();
+                return assignment == null ? null : assignment.getShortConfig();
             case expectedStatus:
-                return slotStatus.getExpectedStatus();
+                return slotStatus.getExpectedState() == null ? null : slotStatus.getExpectedState().toString();
             case expectedBinary:
-                return slotStatus.getExpectedBinary();
+                return expectedAssignment == null ? null : expectedAssignment.getBinary();
             case expectedConfig:
-                return slotStatus.getExpectedConfig();
+                return expectedAssignment == null ? null : expectedAssignment.getConfig();
             case statusMessage:
                 return slotStatus.getStatusMessage();
             default:

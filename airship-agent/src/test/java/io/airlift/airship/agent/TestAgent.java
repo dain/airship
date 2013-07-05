@@ -2,7 +2,7 @@ package io.airlift.airship.agent;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.airship.shared.SlotLifecycleState;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobId;
@@ -90,11 +90,11 @@ public class TestAgent
 
         // verify done
         assertEquals(slotJobStatus.getState(), SlotJobState.DONE);
-        SlotStatusRepresentation slotStatus = slotJobStatus.getSlotStatus();
+        SlotStatus slotStatus = slotJobStatus.getSlotStatus();
         assertNotNull(slotStatus, "slotStatus is null");
-        assertEquals(slotStatus.getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
-        assertEquals(slotStatus.getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
-        assertEquals(slotStatus.getStatus(), SlotLifecycleState.STOPPED.toString());
+        assertEquals(slotStatus.getAssignment().getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
+        assertEquals(slotStatus.getAssignment().getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
+        assertEquals(slotStatus.getState(), SlotLifecycleState.STOPPED);
 
         Slot slot = agent.getSlot(slotStatus.getId());
         assertNotNull(slot, "slot is null");
@@ -128,15 +128,15 @@ public class TestAgent
 
         // verify done
         assertEquals(slotJobStatus.getState(), SlotJobState.DONE);
-        SlotStatusRepresentation slotStatus = slotJobStatus.getSlotStatus();
+        SlotStatus slotStatus = slotJobStatus.getSlotStatus();
         assertNotNull(slotStatus, "slotStatus is null");
-        assertEquals(slotStatus.getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
-        assertEquals(slotStatus.getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
+        assertEquals(slotStatus.getAssignment().getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
+        assertEquals(slotStatus.getAssignment().getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
         try {
-            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString());
+            assertEquals(slotStatus.getState(), SlotLifecycleState.RUNNING);
         }
         catch (Throwable t) {
-            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString(), "with update");
+            assertEquals(slotStatus.getState(), SlotLifecycleState.RUNNING, "with update");
             throw t;
         }
 

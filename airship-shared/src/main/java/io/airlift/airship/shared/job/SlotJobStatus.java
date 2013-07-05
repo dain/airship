@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 
 import java.net.URI;
 import java.util.List;
@@ -38,7 +38,7 @@ public class SlotJobStatus
     private final SlotJobId slotJobId;
     private final URI self;
     private final SlotJobState state;
-    private final SlotStatusRepresentation slotStatus;
+    private final SlotStatus slotStatus;
     private final String progressDescription;
     private final Double progressPercentage;
     private final List<TaskStatus> tasks;
@@ -48,7 +48,7 @@ public class SlotJobStatus
             @JsonProperty("slotJobId") SlotJobId slotJobId,
             @JsonProperty("self") URI self,
             @JsonProperty("state") SlotJobState state,
-            @JsonProperty("slotStatus") SlotStatusRepresentation slotStatus,
+            @JsonProperty("slotStatus") SlotStatus slotStatus,
             @JsonProperty("progressDescription") String progressDescription,
             @JsonProperty("progressPercentage") Double progressPercentage,
             @JsonProperty("tasks") List<TaskStatus> tasks)
@@ -81,7 +81,7 @@ public class SlotJobStatus
     }
 
     @JsonProperty
-    public SlotStatusRepresentation getSlotStatus()
+    public SlotStatus getSlotStatus()
     {
         return slotStatus;
     }
@@ -117,12 +117,12 @@ public class SlotJobStatus
                 .toString();
     }
 
-    public static Function<SlotJobStatus, SlotStatusRepresentation> slotStatusGetter()
+    public static Function<SlotJobStatus, SlotStatus> slotStatusGetter()
     {
-        return new Function<SlotJobStatus, SlotStatusRepresentation>()
+        return new Function<SlotJobStatus, SlotStatus>()
         {
             @Override
-            public SlotStatusRepresentation apply(SlotJobStatus input)
+            public SlotStatus apply(SlotJobStatus input)
             {
                 return input.getSlotStatus();
             }

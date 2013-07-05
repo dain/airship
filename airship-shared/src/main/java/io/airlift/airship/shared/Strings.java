@@ -9,7 +9,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.SortedSet;
@@ -21,23 +20,24 @@ import static java.lang.Math.min;
 
 public class Strings
 {
-    public static int commonPrefixSegments(char separator, Collection<String> strings)
+    public static int commonPrefixSegments(char separator, Iterable<String> strings)
     {
         return commonPrefixSegments(separator, strings, 0);
     }
 
-    public static int commonPrefixSegments(char separator, Collection<String> strings, int minSize)
+    public static int commonPrefixSegments(char separator, Iterable<String> strings, int minSize)
     {
         Preconditions.checkNotNull(strings, "strings is null");
         Preconditions.checkArgument(minSize >= 0, "minSize is negative");
 
-        if (strings.isEmpty()) {
+        List<String> elements = ImmutableList.copyOf(strings);
+        if (elements.isEmpty()) {
             return 0;
         }
 
         int shortestNumberOfParts = Integer.MAX_VALUE;
         List<List<String>> stringsParts = newArrayList();
-        for (String string : strings) {
+        for (String string : elements) {
             List<String> parts = ImmutableList.copyOf(Splitter.on(separator).split(string));
             if (parts.isEmpty() || !parts.get(0).isEmpty()) {
                 throw new IllegalArgumentException("All strings must start with the separator character");
@@ -93,25 +93,25 @@ public class Strings
         return trimmedString;
     }
 
-    public static int shortestUniquePrefix(Collection<String> strings)
+    public static int shortestUniquePrefix(Iterable<String> strings)
     {
         return shortestUniquePrefix(strings, 1);
     }
 
-    public static int shortestUniquePrefix(Collection<String> strings, int minSize)
+    public static int shortestUniquePrefix(Iterable<String> strings, int minSize)
     {
         Preconditions.checkNotNull(strings, "strings is null");
 
         // remove nulls
-        strings = ImmutableList.copyOf(Iterables.filter(strings, Predicates.notNull()));
+        List<String> elements = ImmutableList.copyOf(Iterables.filter(strings, Predicates.notNull()));
 
         // must have at least two strings to calculate min size
-        if (strings.size() < 2) {
+        if (elements.size() < 2) {
             return minSize;
         }
 
-        SortedSet<String> sorted = Sets.newTreeSet(strings);
-        if (sorted.size() != strings.size()) {
+        SortedSet<String> sorted = Sets.newTreeSet(elements);
+        if (sorted.size() != elements.size()) {
             throw new IllegalArgumentException("Cannot compute unique prefix size for collection with duplicate entries");
         }
 

@@ -33,11 +33,10 @@ import io.airlift.airship.coordinator.HttpRemoteAgent;
 import io.airlift.airship.coordinator.HttpRemoteSlot;
 import io.airlift.airship.coordinator.HttpRemoteSlotJobFactory;
 import io.airlift.airship.coordinator.RemoteSlot;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.configuration.ConfigurationFactory;
@@ -143,8 +142,8 @@ public class TestRemoteSlot
                 client,
                 executor,
                 jsonCodec(InstallationRepresentation.class),
-                jsonCodec(AgentStatusRepresentation.class),
-                jsonCodec(SlotStatusRepresentation.class),
+                jsonCodec(AgentStatus.class),
+                jsonCodec(SlotStatus.class),
                 jsonCodec(ServiceDescriptorsRepresentation.class));
     }
 

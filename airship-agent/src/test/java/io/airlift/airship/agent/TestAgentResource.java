@@ -1,6 +1,6 @@
 package io.airlift.airship.agent;
 
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
@@ -47,7 +47,7 @@ public class TestAgentResource
             throws InterruptedException
     {
         Response response = agentResource.getAgentStatus(null, null);
-        AgentStatusRepresentation actual = (AgentStatusRepresentation) response.getEntity();
+        AgentStatus actual = (AgentStatus) response.getEntity();
         assertEquals(actual.getAgentId(), agent.getAgentId());
         assertEquals(actual.getState(), ONLINE);
         assertEquals(actual.getInstanceType(), null);

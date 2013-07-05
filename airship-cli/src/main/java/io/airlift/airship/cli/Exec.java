@@ -1,7 +1,7 @@
 package io.airlift.airship.cli;
 
 import com.google.common.base.Preconditions;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import jnr.posix.POSIX;
 import jnr.posix.POSIXFactory;
 import jnr.posix.util.Platform;
@@ -15,7 +15,7 @@ public class Exec
 {
     public static String PS = Platform.IS_WINDOWS ? ";" : ":";
 
-    public static void execLocal(SlotStatusRepresentation slot, String command)
+    public static void execLocal(SlotStatus slot, String command)
     {
         command = firstNonNull(command, "exec -l $0");
 

@@ -24,13 +24,13 @@ import io.airlift.airship.coordinator.job.InstallationRequest;
 import io.airlift.airship.coordinator.job.JobResource;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.LifecycleRequest;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.ExpectedSlotStatus;
 import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.discovery.client.ServiceDescriptor;
@@ -79,8 +79,8 @@ public class CoordinatorMainModule
 
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(InstallationRepresentation.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(CoordinatorStatusRepresentation.class);
-        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(AgentStatusRepresentation.class);
-        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(SlotStatusRepresentation.class);
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(AgentStatus.class);
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(SlotStatus.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(ServiceDescriptorsRepresentation.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(ExpectedSlotStatus.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindListJsonCodec(ServiceDescriptor.class);

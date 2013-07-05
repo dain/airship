@@ -16,7 +16,6 @@ package io.airlift.airship.agent;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.units.Duration;
 
@@ -55,7 +54,6 @@ public class AgentResource
         }
 
         AgentStatus agentStatus = agent.getAgentStatus();
-        AgentStatusRepresentation agentStatusRepresentation = AgentStatusRepresentation.from(agentStatus);
-        return Response.ok(agentStatusRepresentation).build();
+        return Response.ok(agentStatus).build();
     }
 }

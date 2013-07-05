@@ -26,11 +26,10 @@ import io.airlift.airship.coordinator.StaticProvisionerModule;
 import io.airlift.airship.coordinator.TestingMavenRepository;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.SlotLifecycleState;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.configuration.ConfigurationFactory;
 import io.airlift.configuration.ConfigurationModule;
 import io.airlift.event.client.EventModule;
@@ -251,7 +250,7 @@ public class TestCliIntegration
 //        AgentStatusRepresentation agent = outputFormat.agents.get(0);
         String agentInstanceId = coordinator.provisionAgents("agent:config:1", 1, "instance-type", null, null, null, null).get(0).getInstanceId();
         waitForAgentToBeOnline(agentInstanceId);
-        AgentStatusRepresentation agent = AgentStatusRepresentation.from(coordinator.getAgents().get(0));
+        AgentStatus agent = coordinator.getAgents().get(0);
         assertNotNull(agent.getAgentId());
 
 //        execute("coordinator", "show");
@@ -265,7 +264,7 @@ public class TestCliIntegration
 
         assertNotNull(outputFormat.slots);
         assertEquals(outputFormat.slots.size(), 1);
-        SlotStatusRepresentation slot = outputFormat.slots.get(0);
+        SlotStatus slot = outputFormat.slots.get(0);
         UUID slotId = slot.getId();
         assertNotNull(slotId);
         assertSlotStatus(slot, slotId, APPLE_ASSIGNMENT, SlotLifecycleState.STOPPED, agent);
@@ -431,7 +430,7 @@ public class TestCliIntegration
         assertNull(outputFormat.slots);
         assertNull(outputFormat.coordinators);
         assertEquals(outputFormat.agents.size(), 1);
-        AgentStatusRepresentation agent = outputFormat.agents.get(0);
+        AgentStatus agent = outputFormat.agents.get(0);
 
         execute("install", APPLE_ASSIGNMENT.getConfig(), APPLE_ASSIGNMENT.getBinary());
         assertNotNull(outputFormat.slots);
@@ -446,7 +445,7 @@ public class TestCliIntegration
         assertNotNull(outputFormat.slots);
         assertEquals(outputFormat.slots.size(), 1);
 
-        ListMultimap<Assignment, SlotStatusRepresentation> slots;
+        ListMultimap<Assignment, SlotStatus> slots;
         execute("show");
         slots = slotsByAssignment();
         assertEquals(slots.get(APPLE_ASSIGNMENT).size(), 2);
@@ -529,34 +528,33 @@ public class TestCliIntegration
 //        assertEquals(slots.get(BANANA_ASSIGNMENT_EXACT).size(), 0);
     }
 
-    private ListMultimap<Assignment, SlotStatusRepresentation> slotsByAssignment()
+    private ListMultimap<Assignment, SlotStatus> slotsByAssignment()
     {
         assertNotNull(outputFormat.slots);
-        ArrayListMultimap<Assignment, SlotStatusRepresentation> slotsByAssignment = ArrayListMultimap.create();
-        for (SlotStatusRepresentation slot : outputFormat.slots) {
-            slotsByAssignment.put(new Assignment(slot.getBinary(), slot.getConfig()), slot);
+        ArrayListMultimap<Assignment, SlotStatus> slotsByAssignment = ArrayListMultimap.create();
+        for (SlotStatus slot : outputFormat.slots) {
+            slotsByAssignment.put(new Assignment(slot.getAssignment().getBinary(), slot.getAssignment().getConfig()), slot);
         }
         return slotsByAssignment;
     }
 
-    private void assertSlotStatus(SlotStatusRepresentation slot,
+    private void assertSlotStatus(SlotStatus slot,
             UUID expectedSlotId,
             Assignment expectedAssignment,
             SlotLifecycleState expectedState,
-            AgentStatusRepresentation expectedAgent)
+            AgentStatus expectedAgent)
     {
         assertEquals(slot.getId(), expectedSlotId);
         if (expectedState != SlotLifecycleState.TERMINATED) {
-            assertEquals(slot.getBinary(), expectedAssignment.getBinary());
-            assertEquals(slot.getConfig(), expectedAssignment.getConfig());
+            assertEquals(slot.getAssignment().getBinary(), expectedAssignment.getBinary());
+            assertEquals(slot.getAssignment().getConfig(), expectedAssignment.getConfig());
             assertNotNull(slot.getInstallPath());
         }
         else {
-            assertNull(slot.getBinary());
-            assertNull(slot.getConfig());
+            assertNull(slot.getAssignment());
             assertNull(slot.getInstallPath());
         }
-        assertEquals(slot.getStatus(), expectedState.toString());
+        assertEquals(slot.getState(), expectedState);
 // todo broken
 //        assertEquals(slot.getInstanceId(), expectedAgent.getInstanceId());
         assertTrue(slot.getLocation().startsWith(expectedAgent.getLocation()));
@@ -585,8 +583,8 @@ public class TestCliIntegration
             implements OutputFormat
     {
         private List<CoordinatorStatusRepresentation> coordinators;
-        private List<AgentStatusRepresentation> agents;
-        private List<SlotStatusRepresentation> slots;
+        private List<AgentStatus> agents;
+        private List<SlotStatus> slots;
 
         public void clear()
         {
@@ -602,13 +600,13 @@ public class TestCliIntegration
         }
 
         @Override
-        public void displayAgents(Iterable<AgentStatusRepresentation> agents)
+        public void displayAgents(Iterable<AgentStatus> agents)
         {
             this.agents = ImmutableList.copyOf(agents);
         }
 
         @Override
-        public void displaySlots(Iterable<SlotStatusRepresentation> slots)
+        public void displaySlots(Iterable<SlotStatus> slots)
         {
             this.slots = ImmutableList.copyOf(slots);
         }

@@ -262,7 +262,7 @@ public class MockProvisioner implements Provisioner
                 externalUri,
                 agentStatus.getLocation(),
                 agentStatus.getInstanceType(),
-                agentStatus.getSlotStatuses(),
+                agentStatus.getSlots(),
                 agentStatus.getResources());
 
         agents.put(instanceId, newAgentStatus);

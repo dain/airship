@@ -3,7 +3,7 @@ package io.airlift.airship.shared.job;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.airship.shared.FailureInfo;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.job.SlotJobStatus.SlotJobState;
 import io.airlift.airship.shared.job.TaskStatus.TaskState;
 import io.airlift.json.JsonCodec;
@@ -26,25 +26,21 @@ public class TestSlotJobStatus
     {
         JsonCodec<SlotJobStatus> jsonCodec = JsonCodec.jsonCodec(SlotJobStatus.class);
 
-        SlotStatusRepresentation representation = new SlotStatusRepresentation(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                null,
+        SlotStatus representation = new SlotStatus(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                "aaaa",
                 URI.create("internal://apple"),
                 URI.create("external://apple"),
                 "instance",
                 "/test/location/apple",
                 "/location/apple",
-                APPLE_ASSIGNMENT.getBinary(),
-                APPLE_ASSIGNMENT.getBinary(),
-                APPLE_ASSIGNMENT.getConfig(),
-                APPLE_ASSIGNMENT.getConfig(),
-                STOPPED.toString(),
-                "abc",
-                null,
+                STOPPED,
+                APPLE_ASSIGNMENT,
                 "/apple",
                 ImmutableMap.<String, Integer>of(),
-                null,
-                null,
-                null);
+                STOPPED,
+                APPLE_ASSIGNMENT,
+                "status message",
+                "version");
 
         SlotJobStatus expected = new SlotJobStatus(new SlotJobId("id"),
                 URI.create("internal://apple/v1/job/id"),
@@ -76,10 +72,10 @@ public class TestSlotJobStatus
             assertEquals(actualTask.getState(), expectedTask.getState());
             if (actualTask.getFailureInfo() != null) {
                 assertEquals(actualTask.getFailureInfo().getMessage(), expectedTask.getFailureInfo().getMessage());
-            } else {
+            }
+            else {
                 assertEquals(actualTask.getFailureInfo(), expectedTask.getFailureInfo());
             }
         }
     }
-
 }

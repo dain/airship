@@ -25,7 +25,6 @@ import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
 import io.airlift.node.NodeInfo;
@@ -214,10 +213,10 @@ public class TestCoordinatorLifecycleResource
         JobStatus job = (JobStatus) response.getEntity();
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        Builder<SlotStatusRepresentation> builder = ImmutableList.builder();
+        Builder<SlotStatus> builder = ImmutableList.builder();
         for (UUID slotId : slotIds) {
-            SlotStatus slotStatus = agentStatus.getSlotStatus(slotId);
-            builder.add(SlotStatusRepresentation.from(slotStatus.changeState(state)));
+            SlotStatus slotStatus = agentStatus.getSlot(slotId);
+            builder.add(slotStatus.changeState(state));
             assertEquals(slotStatus.getAssignment(), APPLE_ASSIGNMENT);
         }
 
@@ -227,7 +226,7 @@ public class TestCoordinatorLifecycleResource
 
     private void assertSlotState(UUID slotId, SlotLifecycleState state)
     {
-        assertEquals(coordinator.getAgentByAgentId(agentId).getSlotStatus(slotId).getState(), state);
+        assertEquals(coordinator.getAgentByAgentId(agentId).getSlot(slotId).getState(), state);
 
     }
 }

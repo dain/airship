@@ -3,7 +3,7 @@ package io.airlift.airship.agent;
 import com.google.common.collect.ImmutableList;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotLifecycleState;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.KillTask;
 import io.airlift.airship.shared.job.RestartTask;
@@ -70,13 +70,13 @@ public abstract class AbstractTestLifecycleJobs
 
         // verify done
         assertEquals(slotJobStatus.getState(), SlotJobState.DONE);
-        SlotStatusRepresentation slotStatus = slotJobStatus.getSlotStatus();
+        SlotStatus slotStatus = slotJobStatus.getSlotStatus();
         assertNotNull(slotStatus, "slotStatus is null");
         if (expectedState != TERMINATED) {
-            assertEquals(slotStatus.getBinary(), expectedInstallation.getAssignment().getBinary());
-            assertEquals(slotStatus.getConfig(), expectedInstallation.getAssignment().getConfig());
+            assertEquals(slotStatus.getAssignment().getBinary(), expectedInstallation.getAssignment().getBinary());
+            assertEquals(slotStatus.getAssignment().getConfig(), expectedInstallation.getAssignment().getConfig());
         }
-        assertEquals(slotStatus.getStatus(), expectedState.toString());
+        assertEquals(slotStatus.getState(), expectedState);
 
         Slot slot = getAgent().getSlot(slotStatus.getId());
         assertNotNull(slot, "slot is null");

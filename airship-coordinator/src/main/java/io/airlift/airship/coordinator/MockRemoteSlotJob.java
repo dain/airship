@@ -1,7 +1,7 @@
 package io.airlift.airship.coordinator;
 
 import com.google.common.collect.ImmutableList;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.airship.shared.StateMachine.StateChangeListener;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobStatus;
@@ -16,9 +16,9 @@ public class MockRemoteSlotJob
 {
     private final URI agentUri;
     private final SlotJob slotJob;
-    private final SlotStatusRepresentation slotStatus;
+    private final SlotStatus slotStatus;
 
-    public MockRemoteSlotJob(URI agentUri, SlotJob slotJob, SlotStatusRepresentation slotStatus)
+    public MockRemoteSlotJob(URI agentUri, SlotJob slotJob, SlotStatus slotStatus)
     {
         this.agentUri = agentUri;
         this.slotStatus = slotStatus;

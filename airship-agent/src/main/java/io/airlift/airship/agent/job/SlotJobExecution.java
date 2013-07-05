@@ -8,7 +8,6 @@ import io.airlift.airship.agent.Slot;
 import io.airlift.airship.agent.Progress;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.StateMachine;
 import io.airlift.airship.shared.StateMachine.StateChangeListener;
 import io.airlift.airship.shared.job.SlotJobId;
@@ -71,11 +70,11 @@ public class SlotJobExecution
         // and the job state.
         SlotJobState jobState = state.get();
 
-        SlotStatusRepresentation slotStatus = null;
+        SlotStatus slotStatus = null;
         if (slotId.get() != null) {
             Slot slot = agent.getSlot(slotId.get());
             SlotStatus status = slot.status();
-            slotStatus = SlotStatusRepresentation.from(status);
+            slotStatus = status;
         }
 
         return new SlotJobStatus(slotJobId,

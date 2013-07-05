@@ -1,9 +1,10 @@
 package io.airlift.airship.shared;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
@@ -11,22 +12,31 @@ import com.google.common.collect.Maps;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
 import static com.google.common.base.Objects.firstNonNull;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Maps.newHashMap;
 import static io.airlift.airship.shared.SlotLifecycleState.TERMINATED;
+import static io.airlift.airship.shared.Strings.commonPrefixSegments;
+import static io.airlift.airship.shared.Strings.safeTruncate;
+import static io.airlift.airship.shared.Strings.shortestUniquePrefix;
+import static io.airlift.airship.shared.Strings.trimLeadingSegments;
 
 @Immutable
 public class AgentStatus
 {
     private final String agentId;
+    private final String shortAgentId;
     private final AgentLifecycleState state;
     private final String instanceId;
     private final URI internalUri;
@@ -34,32 +44,62 @@ public class AgentStatus
     private final Map<UUID, SlotStatus> slots;
     private final String location;
     private final String instanceType;
+    private final String shortLocation;
     private final Map<String, Integer> resources;
     private final String version;
 
-    public AgentStatus(String agentId,
+    public AgentStatus(
+            String agentId,
             AgentLifecycleState state,
-            final String instanceId,
+            String instanceId,
             URI internalUri,
             URI externalUri,
             String location,
             String instanceType,
-            Iterable<SlotStatus> slots,
+            Collection<SlotStatus> slots,
             Map<String, Integer> resources)
     {
-        Preconditions.checkNotNull(state, "state is null");
-        Preconditions.checkNotNull(slots, "slots is null");
-        Preconditions.checkNotNull(resources, "resources is null");
+        this(agentId,
+                agentId,
+                state,
+                instanceId,
+                internalUri,
+                externalUri,
+                location,
+                location,
+                instanceType,
+                slots,
+                resources,
+                createAgentVersion(agentId, state, slots, resources));
+    }
 
+    @JsonCreator
+    public AgentStatus(
+            @JsonProperty("agentId") String agentId,
+            @JsonProperty("shortAgentId") String shortAgentId,
+            @JsonProperty("state") AgentLifecycleState state,
+            @JsonProperty("instanceId") final String instanceId,
+            @JsonProperty("internalUri") URI internalUri,
+            @JsonProperty("externalUri") URI externalUri,
+            @JsonProperty("location") String location,
+            @JsonProperty("shortLocation") String shortLocation,
+            @JsonProperty("instanceType") String instanceType,
+            @JsonProperty("slots") Collection<SlotStatus> slots,
+            @JsonProperty("resources") Map<String, Integer> resources,
+            @JsonProperty("version") String version)
+    {
+        // agent id is null while agent is offline
         this.agentId = agentId;
-        this.state = state;
+        this.shortAgentId = shortAgentId;
+        this.state = checkNotNull(state, "state is null");
         this.instanceId = instanceId;
         this.internalUri = internalUri;
         this.externalUri = externalUri;
         this.location = location;
+        this.shortLocation = shortLocation;
         this.instanceType = instanceType;
 
-        slots = transform(slots, new Function<SlotStatus, SlotStatus>()
+        slots = ImmutableList.copyOf(transform(slots, new Function<SlotStatus, SlotStatus>()
         {
             public SlotStatus apply(SlotStatus slotStatus)
             {
@@ -68,23 +108,32 @@ public class AgentStatus
                 }
                 return slotStatus;
             }
-        });
+        }));
         this.slots = Maps.uniqueIndex(slots, SlotStatus.uuidGetter());
 
-        this.resources = ImmutableMap.copyOf(resources);
-        this.version = createAgentVersion(agentId, state, slots, resources);
+        this.resources = ImmutableMap.copyOf(checkNotNull(resources, "resources is null"));
+        this.version = version;
     }
 
+    @JsonProperty
     public String getAgentId()
     {
         return agentId;
     }
 
+    @JsonProperty
+    public String getShortAgentId()
+    {
+        return shortAgentId;
+    }
+
+    @JsonProperty
     public AgentLifecycleState getState()
     {
         return state;
     }
 
+    @JsonProperty
     public String getInstanceId()
     {
         return instanceId;
@@ -122,41 +171,94 @@ public class AgentStatus
         return new AgentStatus(agentId, state, instanceId, internalUri, externalUri, location, instanceType, slots.values(), resources);
     }
 
+    public AgentStatus changeInstance(String instanceId, String instanceType)
+    {
+        return new AgentStatus(agentId, state, instanceId, internalUri, externalUri, location, instanceType, slots.values(), resources);
+    }
+
+    @JsonProperty
     public URI getInternalUri()
     {
         return internalUri;
     }
 
+    public String getInternalHost()
+    {
+        if (getInternalUri() == null) {
+            return null;
+        }
+        return getInternalUri().getHost();
+    }
+
+    public String getInternalIp()
+    {
+        String host = getInternalHost();
+        if (host == null) {
+            return null;
+        }
+
+        if ("localhost".equalsIgnoreCase(host)) {
+            return "127.0.0.1";
+        }
+
+        try {
+            return InetAddress.getByName(host).getHostAddress();
+        }
+        catch (UnknownHostException e) {
+            return "unknown";
+        }
+    }
+
+    @JsonProperty
     public URI getExternalUri()
     {
         return externalUri;
     }
 
+    public String getExternalHost()
+    {
+        if (getExternalUri() == null) {
+            return null;
+        }
+        return getExternalUri().getHost();
+    }
+
+    @JsonProperty
     public String getLocation()
     {
         return location;
     }
 
+    @JsonProperty
+    public String getShortLocation()
+    {
+        return shortLocation;
+    }
+
+    @JsonProperty
     public String getInstanceType()
     {
         return instanceType;
     }
 
-    public SlotStatus getSlotStatus(UUID slotId)
+    public SlotStatus getSlot(UUID slotId)
     {
         return slots.get(slotId);
     }
 
-    public List<SlotStatus> getSlotStatuses()
+    @JsonProperty
+    public List<SlotStatus> getSlots()
     {
         return ImmutableList.copyOf(slots.values());
     }
 
+    @JsonProperty
     public Map<String, Integer> getResources()
     {
         return resources;
     }
 
+    @JsonProperty
     public String getVersion()
     {
         return version;
@@ -205,12 +307,14 @@ public class AgentStatus
     {
         return Objects.toStringHelper(this)
                 .add("agentId", agentId)
+                .add("shortAgentId", shortAgentId)
                 .add("state", state)
                 .add("instanceId", instanceId)
                 .add("internalUri", internalUri)
                 .add("externalUri", externalUri)
                 .add("slots", slots)
                 .add("location", location)
+                .add("shortLocation", shortLocation)
                 .add("instanceType", instanceType)
                 .add("resources", resources)
                 .add("version", version)
@@ -257,5 +361,83 @@ public class AgentStatus
                 return firstNonNull(input.getLocation(), defaultValue);
             }
         };
+    }
+
+    public static Function<AgentStatus, IdAndVersion> agentToIdWithVersion()
+    {
+        return new Function<AgentStatus, IdAndVersion>()
+        {
+            @Override
+            public IdAndVersion apply(AgentStatus input)
+            {
+                return new IdAndVersion(input.getAgentId(), input.getVersion());
+            }
+        };
+    }
+
+    public static Function<AgentStatus, IdAndVersion> agentToIdWithoutVersion()
+    {
+        return new Function<AgentStatus, IdAndVersion>()
+        {
+            @Override
+            public IdAndVersion apply(AgentStatus input)
+            {
+                return new IdAndVersion(input.getAgentId(), null);
+            }
+        };
+    }
+
+    public static Function<AgentStatus, AgentStatus> shortenAgentStatus(List<AgentStatus> agentStatuses)
+    {
+        return shortenAgentStatus(new AgentStatusFactory(agentStatuses));
+    }
+
+    public static Function<AgentStatus, AgentStatus> shortenAgentStatus(final AgentStatusFactory factory)
+    {
+        return new Function<AgentStatus, AgentStatus>()
+        {
+            public AgentStatus apply(AgentStatus status)
+            {
+                return factory.create(status);
+            }
+        };
+    }
+
+    public static class AgentStatusFactory
+    {
+        public static final int MIN_PREFIX_SIZE = 4;
+        public static final int MIN_LOCATION_SEGMENTS = 2;
+
+        private final int shortIdPrefixSize;
+        private final int commonLocationParts;
+
+        public AgentStatusFactory(List<AgentStatus> agentStatuses)
+        {
+            this.shortIdPrefixSize = shortestUniquePrefix(transform(agentStatuses, idGetter()), MIN_PREFIX_SIZE);
+            this.commonLocationParts = commonPrefixSegments('/', transform(agentStatuses, locationGetter("/")), MIN_LOCATION_SEGMENTS);
+        }
+
+        public AgentStatusFactory(int shortIdPrefixSize, int commonLocationParts)
+        {
+            this.shortIdPrefixSize = shortIdPrefixSize;
+            this.commonLocationParts = commonLocationParts;
+        }
+
+        public AgentStatus create(AgentStatus status)
+        {
+            return new AgentStatus(
+                    status.getAgentId(),
+                    safeTruncate(status.getAgentId(), shortIdPrefixSize),
+                    status.getState(),
+                    status.getInstanceId(),
+                    status.getInternalUri(),
+                    status.getExternalUri(),
+                    status.getLocation(),
+                    trimLeadingSegments(status.getLocation(), '/', commonLocationParts),
+                    status.getInstanceType(),
+                    status.getSlots(),
+                    status.getResources(),
+                    status.getVersion());
+        }
     }
 }

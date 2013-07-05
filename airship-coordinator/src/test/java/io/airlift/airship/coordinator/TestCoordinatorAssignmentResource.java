@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.airship.coordinator.job.InstallationRequest;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
+import io.airlift.airship.shared.ExpectedSlotStatus;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotStatus;
@@ -53,6 +54,7 @@ public class TestCoordinatorAssignmentResource
     private UUID apple1SlotId;
     private UUID apple2SlotId;
     private UUID bananaSlotId;
+    private InMemoryStateManager stateManager;
 
     @BeforeMethod
     public void setup()
@@ -61,6 +63,7 @@ public class TestCoordinatorAssignmentResource
         NodeInfo nodeInfo = new NodeInfo("testing");
 
         MockProvisioner provisioner = new MockProvisioner();
+        stateManager = new InMemoryStateManager();
         coordinator = new Coordinator(nodeInfo,
                 new HttpServerInfo(new HttpServerConfig(), nodeInfo),
                 new CoordinatorConfig().setStatusExpiration(new Duration(1, TimeUnit.DAYS)),
@@ -68,7 +71,7 @@ public class TestCoordinatorAssignmentResource
                 provisioner.getAgentFactory(),
                 MOCK_REPO,
                 provisioner,
-                new InMemoryStateManager(),
+                stateManager,
                 new MockServiceInventory());
         resource = new CoordinatorAssignmentResource(coordinator);
 
@@ -82,6 +85,8 @@ public class TestCoordinatorAssignmentResource
                 APPLE_ASSIGNMENT,
                 "/apple1",
                 ImmutableMap.<String, Integer>of());
+        stateManager.setExpectedState(new ExpectedSlotStatus(appleSlotStatus1));
+
         apple2SlotId = UUID.randomUUID();
         SlotStatus appleSlotStatus2 = createSlotStatus(apple2SlotId,
                 URI.create("fake://appleServer2/v1/agent/slot/apple1"),
@@ -92,6 +97,8 @@ public class TestCoordinatorAssignmentResource
                 APPLE_ASSIGNMENT,
                 "/apple2",
                 ImmutableMap.<String, Integer>of());
+        stateManager.setExpectedState(new ExpectedSlotStatus(appleSlotStatus2));
+
         bananaSlotId = UUID.randomUUID();
         SlotStatus bananaSlotStatus = createSlotStatus(bananaSlotId,
                 URI.create("fake://bananaServer/v1/agent/slot/banana"),
@@ -102,6 +109,7 @@ public class TestCoordinatorAssignmentResource
                 BANANA_ASSIGNMENT,
                 "/banana",
                 ImmutableMap.<String, Integer>of());
+        stateManager.setExpectedState(new ExpectedSlotStatus(bananaSlotStatus));
 
         agentId = UUID.randomUUID().toString();
         AgentStatus agentStatus = new AgentStatus(agentId,
@@ -142,9 +150,9 @@ public class TestCoordinatorAssignmentResource
         Response response = resource.upgrade(new InstallationRequest(assignment, IdAndVersion.forIds(apple1SlotId, apple2SlotId)), uriInfo, false);
 
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        SlotStatus apple1Status = agentStatus.getSlot(apple1SlotId);
+        SlotStatus apple2Status = agentStatus.getSlot(apple2SlotId);
+        SlotStatus bananaStatus = agentStatus.getSlot(bananaSlotId);
 
         assertOkResponse(response);
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
@@ -173,9 +181,9 @@ public class TestCoordinatorAssignmentResource
         // upgrade apple slot 1 to binary version 2.0, but leave everything else unchanged
         resource.upgrade(new InstallationRequest(new Assignment("2.0", null), IdAndVersion.forIds(apple1SlotId)), MockUriInfo.from("http://localhost/v1/slot/assignment"), false);
         AgentStatus agentStatus = coordinator.getAgentByAgentId(agentId);
-        SlotStatus apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        SlotStatus apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        SlotStatus bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        SlotStatus apple1Status = agentStatus.getSlot(apple1SlotId);
+        SlotStatus apple2Status = agentStatus.getSlot(apple2SlotId);
+        SlotStatus bananaStatus = agentStatus.getSlot(bananaSlotId);
         assertEquals(apple1Status.getAssignment().getBinary(), APPLE_ASSIGNMENT_2.getBinary());
         assertEquals(apple2Status.getAssignment().getBinary(), APPLE_ASSIGNMENT.getBinary());
         assertEquals(bananaStatus.getAssignment().getBinary(), BANANA_ASSIGNMENT.getBinary());
@@ -187,9 +195,9 @@ public class TestCoordinatorAssignmentResource
 
         coordinator.getAgentByAgentId(agentId);
         agentStatus = coordinator.getAgentByAgentId(agentId);
-        apple1Status = agentStatus.getSlotStatus(apple1SlotId);
-        apple2Status = agentStatus.getSlotStatus(apple2SlotId);
-        bananaStatus = agentStatus.getSlotStatus(bananaSlotId);
+        apple1Status = agentStatus.getSlot(apple1SlotId);
+        apple2Status = agentStatus.getSlot(apple2SlotId);
+        bananaStatus = agentStatus.getSlot(bananaSlotId);
 
         assertOkResponse(response);
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces

@@ -1,9 +1,9 @@
 package io.airlift.airship.cli;
 
 import com.google.common.collect.Iterables;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 
 import static io.airlift.airship.cli.AgentRecord.toAgentRecords;
 import static io.airlift.airship.cli.Column.externalHost;
@@ -31,7 +31,7 @@ public class TableOutputFormat implements OutputFormat
     }
 
     @Override
-    public void displaySlots(Iterable<SlotStatusRepresentation> slots)
+    public void displaySlots(Iterable<SlotStatus> slots)
     {
         if (Iterables.isEmpty(slots)) {
             System.out.println("No slots match the provided filters.");
@@ -43,7 +43,7 @@ public class TableOutputFormat implements OutputFormat
     }
 
     @Override
-    public void displayAgents(Iterable<AgentStatusRepresentation> agents)
+    public void displayAgents(Iterable<AgentStatus> agents)
     {
         if (Iterables.isEmpty(agents)) {
             System.out.println("No agents match the provided filters.");

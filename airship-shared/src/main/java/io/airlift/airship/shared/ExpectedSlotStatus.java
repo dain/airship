@@ -3,9 +3,10 @@ package io.airlift.airship.shared;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 
 import java.util.UUID;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class ExpectedSlotStatus
 {
@@ -13,13 +14,16 @@ public class ExpectedSlotStatus
     private final SlotLifecycleState status;
     private final Assignment assignment;
 
+    public ExpectedSlotStatus(SlotStatus slotStatus)
+    {
+        this(checkNotNull(slotStatus, "slotStatus is null").getId(), slotStatus.getState(), slotStatus.getAssignment());
+    }
+
     public ExpectedSlotStatus(UUID id, SlotLifecycleState status, Assignment assignment)
     {
-        Preconditions.checkNotNull(id, "id is null");
-        Preconditions.checkNotNull(status, "status is null");
-        this.id = id;
+        this.id = checkNotNull(id, "id is null");
         this.assignment = assignment;
-        this.status = status;
+        this.status = checkNotNull(status, "status is null");
     }
 
     @JsonCreator

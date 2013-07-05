@@ -48,7 +48,6 @@ import io.airlift.airship.integration.MockLocalProvisioner.AgentServer;
 import io.airlift.airship.integration.MockLocalProvisioner.CoordinatorServer;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
@@ -58,8 +57,8 @@ import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.SlotLifecycleState;
-import io.airlift.airship.shared.SlotStatusRepresentation;
-import io.airlift.airship.shared.SlotStatusRepresentation.SlotStatusRepresentationFactory;
+import io.airlift.airship.shared.SlotStatus;
+import io.airlift.airship.shared.SlotStatus.SlotStatusFactory;
 import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.airship.shared.job.SlotJobId;
@@ -132,8 +131,8 @@ public class TestServerIntegration
     private Slot bananaSlot;
 
     private final JsonCodec<List<CoordinatorStatusRepresentation>> coordinatorStatusesCodec = listJsonCodec(CoordinatorStatusRepresentation.class);
-    private final JsonCodec<List<AgentStatusRepresentation>> agentStatusesCodec = listJsonCodec(AgentStatusRepresentation.class);
-    private final JsonCodec<List<SlotStatusRepresentation>> slotStatusesCodec = listJsonCodec(SlotStatusRepresentation.class);
+    private final JsonCodec<List<AgentStatus>> agentStatusesCodec = listJsonCodec(AgentStatus.class);
+    private final JsonCodec<List<SlotStatus>> slotStatusesCodec = listJsonCodec(SlotStatus.class);
     private final JsonCodec<CoordinatorProvisioningRepresentation> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRepresentation.class);
     private final JsonCodec<AgentProvisioningRepresentation> agentProvisioningCodec = jsonCodec(AgentProvisioningRepresentation.class);
 
@@ -149,7 +148,7 @@ public class TestServerIntegration
     private Repository repository;
 
     private String agentInstanceId;
-    private SlotStatusRepresentationFactory slotStatusRepresentationFactory;
+    private SlotStatusFactory slotStatusFactory;
     private HttpRemoteSlotJobFactory httpRemoteSlotJobFactory;
 
     @BeforeClass
@@ -296,7 +295,7 @@ public class TestServerIntegration
         assertNotNull(coordinator.getAgent(agentServer.getInstanceId()).getInternalUri());
         assertNotNull(coordinator.getAgent(agentServer.getInstanceId()).getExternalUri());
 
-        slotStatusRepresentationFactory = new SlotStatusRepresentationFactory(ImmutableList.of(appleSlot1.status(), appleSlot2.status(), bananaSlot.status()), repository);
+        slotStatusFactory = new SlotStatusFactory(ImmutableList.of(appleSlot1.status(), appleSlot2.status(), bananaSlot.status()), repository);
         return agent;
     }
 
@@ -404,7 +403,7 @@ public class TestServerIntegration
                 .setUri(coordinatorUriBuilder().appendPath("/v1/admin/agent").build())
                 .build();
 
-        List<AgentStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
+        List<AgentStatus> actual = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
         assertEquals(actual.size(), 0);
     }
 
@@ -426,16 +425,16 @@ public class TestServerIntegration
                 .build();
 
         // verify agents list contains only the agent provisioned above
-        List<AgentStatusRepresentation> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
+        List<AgentStatus> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
         assertEquals(agents.size(), 1);
-        AgentStatusRepresentation actual = agents.get(0);
+        AgentStatus actual = agents.get(0);
         assertEquals(actual.getAgentId(), agentServer.getAgent().getAgentId());
         assertEquals(actual.getState(), AgentLifecycleState.ONLINE);
         assertEquals(actual.getInstanceId(), agentServer.getInstance().getInstanceId());
         assertEquals(actual.getLocation(), agentServer.getInstance().getLocation());
         assertEquals(actual.getInstanceType(), agentServer.getInstance().getInstanceType());
-        assertNotNull(actual.getSelf());
-        assertEquals(actual.getSelf(), agentServer.getInstance().getInternalUri());
+        assertNotNull(actual.getInternalUri());
+        assertEquals(actual.getInternalUri(), agentServer.getInstance().getInternalUri());
         assertNotNull(actual.getExternalUri());
         assertEquals(actual.getExternalUri(), agentServer.getInstance().getExternalUri());
         assertEquals(actual.getResources(), agentServer.getAgent().getAgentStatus().getResources());
@@ -453,7 +452,7 @@ public class TestServerIntegration
                 .setHeader(CONTENT_TYPE, APPLICATION_JSON)
                 .setBodyGenerator(jsonBodyGenerator(agentProvisioningCodec, agentProvisioningRepresentation))
                 .build();
-        List<AgentStatusRepresentation> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
+        List<AgentStatus> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
 
         assertEquals(agents.size(), 1);
         String instanceId = agents.get(0).getInstanceId();
@@ -462,7 +461,7 @@ public class TestServerIntegration
         assertNotNull(location);
         assertEquals(agents.get(0).getInstanceType(), instanceType);
         assertNull(agents.get(0).getAgentId());
-        assertNull(agents.get(0).getSelf());
+        assertNull(agents.get(0).getInternalUri());
         assertNull(agents.get(0).getExternalUri());
         assertEquals(agents.get(0).getState(), AgentLifecycleState.PROVISIONING);
 
@@ -489,13 +488,13 @@ public class TestServerIntegration
         agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
         assertEquals(agents.size(), 1);
 
-        AgentStatusRepresentation actual = agents.get(0);
+        AgentStatus actual = agents.get(0);
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getInstanceType(), instanceType);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getAgentId(), agentServer.getAgent().getAgentId());
-        assertNotNull(actual.getSelf());
-        assertEquals(actual.getSelf(), agentServer.getInstance().getInternalUri());
+        assertNotNull(actual.getInternalUri());
+        assertEquals(actual.getInternalUri(), agentServer.getInstance().getInternalUri());
         assertNotNull(actual.getExternalUri());
         assertEquals(actual.getExternalUri(), agentServer.getInstance().getExternalUri());
         assertEquals(actual.getState(), AgentLifecycleState.ONLINE);
@@ -673,10 +672,10 @@ public class TestServerIntegration
         Request request = Request.Builder.prepareGet()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/slot").addParameter("!binary", "*:apple:*").build())
                 .build();
-        List<SlotStatusRepresentation> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
+        List<SlotStatus> actual = httpClient.execute(request, createJsonResponseHandler(slotStatusesCodec, Status.OK.getStatusCode()));
 
-        List<SlotStatusRepresentation> expected = ImmutableList.of(
-                slotStatusRepresentationFactory.create(bananaSlot.status().changeInstanceId(agentInstanceId)));
+        List<SlotStatus> expected = ImmutableList.of(
+                slotStatusFactory.create(bananaSlot.status().changeInstanceId(agentInstanceId)));
         assertEqualsNoOrder(actual, expected);
     }
 
@@ -716,15 +715,15 @@ public class TestServerIntegration
 
         // verify done
         assertEquals(slotJobStatus.getState(), SlotJobState.DONE);
-        SlotStatusRepresentation slotStatus = slotJobStatus.getSlotStatus();
+        SlotStatus slotStatus = slotJobStatus.getSlotStatus();
         assertNotNull(slotStatus, "slotStatus is null");
-        assertEquals(slotStatus.getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
-        assertEquals(slotStatus.getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
+        assertEquals(slotStatus.getAssignment().getBinary(), APPLE_INSTALLATION.getAssignment().getBinary());
+        assertEquals(slotStatus.getAssignment().getConfig(), APPLE_INSTALLATION.getAssignment().getConfig());
         try {
-            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString());
+            assertEquals(slotStatus.getState(), SlotLifecycleState.RUNNING);
         }
         catch (Throwable t) {
-            assertEquals(slotStatus.getStatus(), SlotLifecycleState.RUNNING.toString(), "with update");
+            assertEquals(slotStatus.getState(), SlotLifecycleState.RUNNING, "with update");
             throw t;
         }
 

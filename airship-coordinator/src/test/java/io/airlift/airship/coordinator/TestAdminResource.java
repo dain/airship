@@ -5,7 +5,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
@@ -242,16 +241,16 @@ public class TestAdminResource
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
-        Iterable<AgentStatusRepresentation> agents = (Iterable<AgentStatusRepresentation>) response.getEntity();
+        Iterable<AgentStatus> agents = (Iterable<AgentStatus>) response.getEntity();
         assertEquals(Iterables.size(agents), 1);
-        AgentStatusRepresentation actual = agents.iterator().next();
+        AgentStatus actual = agents.iterator().next();
 
         assertEquals(actual.getAgentId(), agentId);
         assertEquals(actual.getState(), AgentLifecycleState.ONLINE);
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getInstanceType(), instanceType);
-        assertEquals(actual.getSelf(), internalUri);
+        assertEquals(actual.getInternalUri(), internalUri);
         assertEquals(actual.getExternalUri(), externalUri);
         assertEquals(actual.getResources(), resources);
     }
@@ -270,7 +269,7 @@ public class TestAdminResource
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
-        List<AgentStatusRepresentation> agents = ImmutableList.copyOf((Iterable<AgentStatusRepresentation>) response.getEntity());
+        List<AgentStatus> agents = ImmutableList.copyOf((Iterable<AgentStatus>) response.getEntity());
         assertEquals(agents.size(), 1);
         String instanceId = agents.get(0).getInstanceId();
         assertNotNull(instanceId);
@@ -278,7 +277,7 @@ public class TestAdminResource
         assertNotNull(location);
         assertEquals(agents.get(0).getInstanceType(), instanceType);
         assertNull(agents.get(0).getAgentId());
-        assertNull(agents.get(0).getSelf());
+        assertNull(agents.get(0).getInternalUri());
         assertNull(agents.get(0).getExternalUri());
         assertEquals(agents.get(0).getState(), AgentLifecycleState.PROVISIONING);
 
@@ -300,15 +299,15 @@ public class TestAdminResource
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
 
-        agents = ImmutableList.copyOf((Iterable<AgentStatusRepresentation>) response.getEntity());
+        agents = ImmutableList.copyOf((Iterable<AgentStatus>) response.getEntity());
         assertEquals(agents.size(), 1);
-        AgentStatusRepresentation actual = agents.iterator().next();
+        AgentStatus actual = agents.iterator().next();
 
         assertEquals(actual.getInstanceId(), instanceId);
         assertEquals(actual.getInstanceType(), instanceType);
         assertEquals(actual.getLocation(), location);
         assertEquals(actual.getAgentId(), expectedAgentStatus.getAgentId());
-        assertEquals(actual.getSelf(), expectedAgentStatus.getInternalUri());
+        assertEquals(actual.getInternalUri(), expectedAgentStatus.getInternalUri());
         assertEquals(actual.getExternalUri(), expectedAgentStatus.getExternalUri());
         assertEquals(actual.getState(), AgentLifecycleState.ONLINE);
     }

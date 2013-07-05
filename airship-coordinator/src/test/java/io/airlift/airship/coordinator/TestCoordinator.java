@@ -338,7 +338,7 @@ public class TestCoordinator
         AgentStatus agent = coordinator.getAgents().get(0);
         assertEquals(job.getSlotJobStatuses().size(), 1);
         for (SlotJobStatus slotJob : job.getSlotJobStatuses()) {
-            assertAppleSlot(slotJob.getSlotStatus().toSlotStatus(agent.getInstanceId()));
+            assertAppleSlot(slotJob.getSlotStatus().changeInstanceId(agent.getInstanceId()));
         }
     }
 
@@ -373,7 +373,7 @@ public class TestCoordinator
         AgentStatus agent = coordinator.getAgents().get(0);
         assertEquals(job.getSlotJobStatuses().size(), 1);
         for (SlotJobStatus slotJob : job.getSlotJobStatuses()) {
-            assertAppleSlot(slotJob.getSlotStatus().toSlotStatus(agent.getInstanceId()));
+            assertAppleSlot(slotJob.getSlotStatus().changeInstanceId(agent.getInstanceId()));
         }
     }
 

@@ -15,6 +15,7 @@ package io.airlift.airship.shared;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 import javax.annotation.concurrent.Immutable;
@@ -28,11 +29,28 @@ public class Assignment
     private final String binary;
     private final String config;
 
-    @JsonCreator
-    public Assignment(@JsonProperty("binary") String binary, @JsonProperty("config") String config)
+    private final String shortBinary;
+    private final String shortConfig;
+
+    public Assignment(String binary, String config)
     {
         this.binary = binary;
         this.config = config;
+        this.shortBinary = binary;
+        this.shortConfig = config;
+    }
+
+    @JsonCreator
+    public Assignment(
+            @JsonProperty("binary") String binary,
+            @JsonProperty("config") String config,
+            @JsonProperty("shortBinary") String shortBinary,
+            @JsonProperty("shortConfig") String shortConfig)
+    {
+        this.binary = binary;
+        this.config = config;
+        this.shortBinary = shortBinary;
+        this.shortConfig = shortConfig;
     }
 
     @JsonProperty
@@ -47,47 +65,46 @@ public class Assignment
         return config;
     }
 
-    @Override
-    public boolean equals(Object o)
+    @JsonProperty
+    public String getShortBinary()
     {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
+        return shortBinary;
+    }
 
-        Assignment that = (Assignment) o;
-
-        if (!binary.equals(that.binary)) {
-            return false;
-        }
-        if (!config.equals(that.config)) {
-            return false;
-        }
-
-        return true;
+    @JsonProperty
+    public String getShortConfig()
+    {
+        return shortConfig;
     }
 
     @Override
     public int hashCode()
     {
-        int result = binary.hashCode();
-        result = 31 * result + config.hashCode();
-        return result;
+        return Objects.hashCode(binary, config);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        final Assignment other = (Assignment) obj;
+        return Objects.equal(this.binary, other.binary) &&
+                Objects.equal(this.config, other.config);
     }
 
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("Assignment");
-        sb.append("{binary=").append(binary);
-        sb.append(", config=").append(config);
-        sb.append('}');
-        return sb.toString();
+        return Objects.toStringHelper(this)
+                .add("binary", binary)
+                .add("config", config)
+                .toString();
     }
-
 
     public Assignment upgradeAssignment(Repository repository, Assignment assignment)
     {
@@ -111,7 +128,10 @@ public class Assignment
             checkArgument(repository.configToHttpUri(assignment.getConfig()) != null, "Can not locate existing config " + assignment.getConfig() + " for upgrade");
         }
 
-        return new Assignment(newBinary, newConfig);
+        return new Assignment(newBinary,
+                newConfig,
+                relativizeBinary(repository, newBinary),
+                relativizeConfig(repository, newConfig));
     }
 
     public Assignment forceAssignment(Repository repository)
@@ -124,6 +144,38 @@ public class Assignment
         String newConfig = repository.configResolve(config);
         checkArgument(newConfig != null, "Unknown config " + config);
 
-        return new Assignment(newBinary, newConfig);
+        return new Assignment(newBinary, 
+                newConfig, 
+                relativizeBinary(repository, newBinary),
+                relativizeConfig(repository, newConfig));
+    }
+
+    public static Assignment shortenAssignment(Repository repository, Assignment assignment)
+    {
+        if (assignment == null) {
+            return null;
+        }
+
+        return new Assignment(
+                assignment.binary,
+                assignment.config,
+                relativizeBinary(repository, assignment.binary),
+                relativizeConfig(repository, assignment.config));
+    }
+
+    private static String relativizeBinary(Repository repository, String binary)
+    {
+        if (repository == null) {
+            return binary;
+        }
+        return Objects.firstNonNull(repository.binaryRelativize(binary), binary);
+    }
+
+    private static String relativizeConfig(Repository repository, String config)
+    {
+        if (repository == null) {
+            return config;
+        }
+        return Objects.firstNonNull(repository.configRelativize(config), config);
     }
 }

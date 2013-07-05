@@ -6,12 +6,12 @@ import com.google.common.collect.ListMultimap;
 import io.airlift.airship.cli.Airship.AirshipCommand;
 import io.airlift.airship.cli.Airship.AirshipCommanderCommand;
 import io.airlift.airship.coordinator.TestingMavenRepository;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.FileUtils;
 import io.airlift.airship.shared.SlotLifecycleState;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -83,7 +83,7 @@ public class TestAirship
         assertNull(outputFormat.slots);
         assertNull(outputFormat.coordinators);
         assertEquals(outputFormat.agents.size(), 1);
-        AgentStatusRepresentation agent = outputFormat.agents.get(0);
+        AgentStatus agent = outputFormat.agents.get(0);
 
         execute("coordinator", "show");
 
@@ -96,7 +96,7 @@ public class TestAirship
 
         assertNotNull(outputFormat.slots);
         assertEquals(outputFormat.slots.size(), 1);
-        SlotStatusRepresentation slot = outputFormat.slots.get(0);
+        SlotStatus slot = outputFormat.slots.get(0);
         UUID slotId = slot.getId();
         assertNotNull(slotId);
         assertSlotStatus(slot, slotId, APPLE_ASSIGNMENT, SlotLifecycleState.STOPPED, agent);
@@ -252,7 +252,7 @@ public class TestAirship
         assertNull(outputFormat.slots);
         assertNull(outputFormat.coordinators);
         assertEquals(outputFormat.agents.size(), 1);
-        AgentStatusRepresentation agent = outputFormat.agents.get(0);
+        AgentStatus agent = outputFormat.agents.get(0);
 
         execute("install", APPLE_ASSIGNMENT.getConfig(), APPLE_ASSIGNMENT.getBinary());
         assertNotNull(outputFormat.slots);
@@ -273,7 +273,7 @@ public class TestAirship
         assertNotNull(outputFormat.slots);
         assertEquals(outputFormat.slots.size(), 1);
 
-        ListMultimap<Assignment, SlotStatusRepresentation> slots;
+        ListMultimap<Assignment, SlotStatus> slots;
         execute("show");
         slots = slotsByAssignment();
         assertEquals(slots.get(APPLE_ASSIGNMENT).size(), 2);
@@ -446,38 +446,38 @@ public class TestAirship
         assertEquals(slots.get(BANANA_ASSIGNMENT_EXACT).size(), 0);
     }
 
-    private ListMultimap<Assignment, SlotStatusRepresentation> slotsByAssignment()
+    private ListMultimap<Assignment, SlotStatus> slotsByAssignment()
     {
         assertNotNull(outputFormat.slots);
-        ArrayListMultimap<Assignment, SlotStatusRepresentation> slotsByAssignment = ArrayListMultimap.create();
-        for (SlotStatusRepresentation slot : outputFormat.slots) {
-            slotsByAssignment.put(new Assignment(slot.getBinary(), slot.getConfig()), slot);
+        ArrayListMultimap<Assignment, SlotStatus> slotsByAssignment = ArrayListMultimap.create();
+        for (SlotStatus slot : outputFormat.slots) {
+            slotsByAssignment.put(new Assignment(slot.getAssignment().getBinary(), slot.getAssignment().getConfig()), slot);
         }
         return slotsByAssignment;
     }
 
-    private void assertSlotStatus(SlotStatusRepresentation slot,
+    private void assertSlotStatus(SlotStatus slot,
             UUID expectedSlotId,
             Assignment expectedAssignment,
             SlotLifecycleState expectedState,
-            AgentStatusRepresentation expectedAgent)
+            AgentStatus expectedAgent)
     {
         assertEquals(slot.getId(), expectedSlotId);
         if (expectedState != SlotLifecycleState.TERMINATED) {
-            assertEquals(slot.getBinary(), expectedAssignment.getBinary());
-            assertEquals(slot.getConfig(), expectedAssignment.getConfig());
+            assertEquals(slot.getAssignment().getBinary(), expectedAssignment.getBinary());
+            assertEquals(slot.getAssignment().getConfig(), expectedAssignment.getConfig());
             assertTrue(slot.getInstallPath().startsWith(tempDir.getAbsolutePath()));
         }
         else {
-            assertNull(slot.getBinary());
-            assertNull(slot.getConfig());
+            assertNull(slot.getAssignment().getBinary());
+            assertNull(slot.getAssignment().getConfig());
             assertNull(slot.getInstallPath());
         }
-        assertEquals(slot.getStatus(), expectedState.toString());
+        assertEquals(slot.getState(), expectedState);
         assertEquals(slot.getInstanceId(), expectedAgent.getInstanceId());
         assertTrue(slot.getLocation().startsWith(expectedAgent.getLocation()));
         assertTrue(slot.getLocation().endsWith(slot.getShortLocation()));
-        assertTrue(slot.getSelf().toASCIIString().startsWith(expectedAgent.getSelf().toASCIIString()));
+        assertTrue(slot.getSelf().toASCIIString().startsWith(expectedAgent.getInternalUri().toASCIIString()));
         assertTrue(slot.getExternalUri().toASCIIString().startsWith(expectedAgent.getExternalUri().toASCIIString()));
     }
 
@@ -500,8 +500,8 @@ public class TestAirship
     private static class MockOutputFormat implements OutputFormat
     {
         private List<CoordinatorStatusRepresentation> coordinators;
-        private List<AgentStatusRepresentation> agents;
-        private List<SlotStatusRepresentation> slots;
+        private List<AgentStatus> agents;
+        private List<SlotStatus> slots;
 
         public void clear()
         {
@@ -517,13 +517,13 @@ public class TestAirship
         }
 
         @Override
-        public void displayAgents(Iterable<AgentStatusRepresentation> agents)
+        public void displayAgents(Iterable<AgentStatus> agents)
         {
             this.agents = ImmutableList.copyOf(agents);
         }
 
         @Override
-        public void displaySlots(Iterable<SlotStatusRepresentation> slots)
+        public void displaySlots(Iterable<SlotStatus> slots)
         {
             this.slots = ImmutableList.copyOf(slots);
         }

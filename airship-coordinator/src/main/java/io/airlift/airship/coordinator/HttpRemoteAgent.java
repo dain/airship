@@ -13,14 +13,12 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.airship.coordinator.SimpleHttpResponseHandler.SimpleHttpResponseCallback;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SetThreadName;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.StateMachine;
 import io.airlift.airship.shared.job.SlotJob;
 import io.airlift.discovery.client.ServiceDescriptor;
@@ -61,8 +59,8 @@ public class HttpRemoteAgent
     private static final Logger log = Logger.get(HttpRemoteAgent.class);
 
     private final JsonCodec<InstallationRepresentation> installationCodec;
-    private final JsonCodec<AgentStatusRepresentation> agentStatusCodec;
-    private final JsonCodec<SlotStatusRepresentation> slotStatusCodec;
+    private final JsonCodec<AgentStatus> agentStatusCodec;
+    private final JsonCodec<SlotStatus> slotStatusCodec;
     private final JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec;
     private final HttpRemoteSlotJobFactory slotJobFactory;
 
@@ -82,8 +80,8 @@ public class HttpRemoteAgent
             AsyncHttpClient httpClient,
             Executor executor,
             JsonCodec<InstallationRepresentation> installationCodec,
-            JsonCodec<AgentStatusRepresentation> agentStatusCodec,
-            JsonCodec<SlotStatusRepresentation> slotStatusCodec,
+            JsonCodec<AgentStatus> agentStatusCodec,
+            JsonCodec<SlotStatus> slotStatusCodec,
             JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec)
     {
         HttpRemoteAgent httpRemoteAgent = new HttpRemoteAgent(agentStatus,
@@ -105,8 +103,8 @@ public class HttpRemoteAgent
             AsyncHttpClient httpClient,
             Executor executor,
             JsonCodec<InstallationRepresentation> installationCodec,
-            JsonCodec<AgentStatusRepresentation> agentStatusCodec,
-            JsonCodec<SlotStatusRepresentation> slotStatusCodec,
+            JsonCodec<AgentStatus> agentStatusCodec,
+            JsonCodec<SlotStatus> slotStatusCodec,
             JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec)
     {
         this.agentId = agentStatus.getAgentId();
@@ -177,7 +175,7 @@ public class HttpRemoteAgent
     @Override
     public synchronized List<? extends RemoteSlot> getSlots()
     {
-        return ImmutableList.copyOf(Iterables.transform(status().getSlotStatuses(), new Function<SlotStatus, HttpRemoteSlot>()
+        return ImmutableList.copyOf(Iterables.transform(status().getSlots(), new Function<SlotStatus, HttpRemoteSlot>()
         {
             @Override
             public HttpRemoteSlot apply(SlotStatus slotStatus)
@@ -258,9 +256,9 @@ public class HttpRemoteAgent
                     .setHeader(CONTENT_TYPE, APPLICATION_JSON)
                     .setBodyGenerator(jsonBodyGenerator(installationCodec, InstallationRepresentation.from(installation)))
                     .build();
-            SlotStatusRepresentation slotStatusRepresentation = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.CREATED.getStatusCode()));
+            SlotStatus slotStatus = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.CREATED.getStatusCode()));
 
-            SlotStatus slotStatus = slotStatusRepresentation.toSlotStatus(agentStatus.getInstanceId());
+            slotStatus = slotStatus.changeInstanceId(agentStatus.getInstanceId());
             setStatus(agentStatus.changeSlotStatus(slotStatus));
 
             return slotStatus;
@@ -276,10 +274,10 @@ public class HttpRemoteAgent
      * a regular interval, and state changes will be immediately recorded.
      */
     private class ContinuousAgentUpdater
-            implements SimpleHttpResponseCallback<AgentStatusRepresentation>
+            implements SimpleHttpResponseCallback<AgentStatus>
     {
         @GuardedBy("this")
-        private ListenableFuture<JsonResponse<AgentStatusRepresentation>> future;
+        private ListenableFuture<JsonResponse<AgentStatus>> future;
 
         private final AtomicLong failureCount = new AtomicLong();
 
@@ -325,7 +323,7 @@ public class HttpRemoteAgent
         }
 
         @Override
-        public void success(AgentStatusRepresentation value)
+        public void success(AgentStatus value)
         {
             try (SetThreadName setThreadName = new SetThreadName("ContinuousAgentUpdater-%s", agentId)) {
                 synchronized (this) {
@@ -336,7 +334,7 @@ public class HttpRemoteAgent
 
                 try {
                     AgentStatus currentStatus = agentStatus.get();
-                    AgentStatus newStatus = value.toAgentStatus(currentStatus.getInstanceId(), currentStatus.getInstanceType());
+                    AgentStatus newStatus = value.changeInstance(currentStatus.getInstanceId(), currentStatus.getInstanceType());
                     // todo deal with out of order responses
                     agentStatus.set(newStatus);
                 }

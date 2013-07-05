@@ -15,7 +15,6 @@ package io.airlift.airship.coordinator;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 import io.airlift.airship.coordinator.job.InstallationRequest;
 import io.airlift.airship.coordinator.job.JobStatus;
@@ -25,12 +24,10 @@ import io.airlift.airship.shared.SlotStatus;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -41,8 +38,8 @@ import java.util.UUID;
 
 import static com.google.common.collect.Lists.transform;
 import static io.airlift.airship.coordinator.job.JobInfoUtil.makeJobStatusResponse;
+import static io.airlift.airship.shared.SlotStatus.shortenSlotStatus;
 import static io.airlift.airship.shared.SlotStatus.uuidGetter;
-import static io.airlift.airship.shared.SlotStatusRepresentation.fromSlotStatus;
 
 @Path("/v1/slot")
 public class CoordinatorSlotResource
@@ -74,8 +71,7 @@ public class CoordinatorSlotResource
         List<SlotStatus> slots = coordinator.getAllSlotsStatus(slotFilter);
 
         // build response
-        return Response.ok(Iterables.transform(slots, fromSlotStatus(coordinator.getAllSlotsStatus(), repository)))
-                .build();
+        return Response.ok(transform(slots, shortenSlotStatus(coordinator.getAllSlotsStatus(), repository))).build();
     }
 
     @POST

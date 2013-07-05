@@ -6,10 +6,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
 import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.json.JsonCodec;
@@ -23,8 +21,8 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
     private final String environment;
     private final AsyncHttpClient httpClient;
     private final JsonCodec<InstallationRepresentation> installationCodec;
-    private final JsonCodec<AgentStatusRepresentation> agentStatusCodec;
-    private final JsonCodec<SlotStatusRepresentation> slotStatusCodec;
+    private final JsonCodec<AgentStatus> agentStatusCodec;
+    private final JsonCodec<SlotStatus> slotStatusCodec;
     private final JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec;
     private final HttpRemoteSlotJobFactory slotJobFactory;
     private final Executor executor;
@@ -34,8 +32,8 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
             @Global AsyncHttpClient httpClient,
             HttpRemoteSlotJobFactory slotJobFactory,
             JsonCodec<InstallationRepresentation> installationCodec,
-            JsonCodec<SlotStatusRepresentation> slotStatusCodec,
-            JsonCodec<AgentStatusRepresentation> agentStatusCodec,
+            JsonCodec<SlotStatus> slotStatusCodec,
+            JsonCodec<AgentStatus> agentStatusCodec,
             JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec)
     {
         environment = nodeInfo.getEnvironment();

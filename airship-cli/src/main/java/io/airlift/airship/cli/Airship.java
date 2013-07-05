@@ -33,13 +33,13 @@ import io.airlift.airship.coordinator.Instance;
 import io.airlift.airship.coordinator.MavenRepository;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.command.Arguments;
 import io.airlift.command.Cli;
 import io.airlift.command.Cli.CliBuilder;
@@ -76,12 +76,12 @@ import static com.google.common.base.Objects.firstNonNull;
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.io.ByteStreams.nullOutputStream;
 import static io.airlift.airship.coordinator.AwsProvisioner.toInstance;
-import static io.airlift.airship.shared.AgentStatusRepresentation.agentToIdWithVersion;
-import static io.airlift.airship.shared.AgentStatusRepresentation.agentToIdWithoutVersion;
+import static io.airlift.airship.shared.AgentStatus.agentToIdWithVersion;
+import static io.airlift.airship.shared.AgentStatus.agentToIdWithoutVersion;
 import static io.airlift.airship.shared.ConfigUtils.createConfigurationFactory;
 import static io.airlift.airship.shared.HttpUriBuilder.uriBuilder;
-import static io.airlift.airship.shared.SlotStatusRepresentation.slotToIdWithVersion;
-import static io.airlift.airship.shared.SlotStatusRepresentation.slotToIdWithoutVersion;
+import static io.airlift.airship.shared.SlotStatus.slotToIdWithVersion;
+import static io.airlift.airship.shared.SlotStatus.slotToIdWithoutVersion;
 import static io.airlift.airship.shared.job.SlotJobStatus.slotStatusGetter;
 import static java.lang.Boolean.parseBoolean;
 import static java.lang.String.format;
@@ -304,7 +304,7 @@ public class Airship
             Preconditions.checkArgument(slotFilter.isFiltered(), "A filter is required");
 
             // show affected slots
-            List<SlotStatusRepresentation> response = commander.show(slotFilter);
+            List<SlotStatus> response = commander.show(slotFilter);
 
             if (globalOptions.batch) {
                 slotExecution.execute(commander, Lists.transform(response, slotToIdWithoutVersion()));
@@ -345,12 +345,12 @@ public class Airship
             }
         }
 
-        public void displaySlots(Iterable<SlotStatusRepresentation> slots)
+        public void displaySlots(Iterable<SlotStatus> slots)
         {
             outputFormat.displaySlots(slots);
         }
 
-        public void displayAgents(Iterable<AgentStatusRepresentation> agents)
+        public void displayAgents(Iterable<AgentStatus> agents)
         {
             outputFormat.displayAgents(agents);
         }
@@ -399,7 +399,7 @@ public class Airship
         @Override
         public void execute(Commander commander)
         {
-            List<SlotStatusRepresentation> response = commander.show(slotFilter);
+            List<SlotStatus> response = commander.show(slotFilter);
             displaySlots(response);
         }
 
@@ -455,7 +455,7 @@ public class Airship
             agentFilter.assignableFilters.add(assignment);
 
             // select agents
-            List<AgentStatusRepresentation> agents = commander.showAgents(agentFilter);
+            List<AgentStatus> agents = commander.showAgents(agentFilter);
             if (agents.isEmpty()) {
                 System.out.println("No agents match the provided filters, matched the software constrains or had the required resources available for the software");
                 return;
@@ -485,7 +485,7 @@ public class Airship
 
             // build filter for only the shown agents
             AgentFilter uuidFilter = new AgentFilter();
-            for (AgentStatusRepresentation agent : agents) {
+            for (AgentStatus agent : agents) {
                 uuidFilter.uuid.add(agent.getAgentId());
             }
 
@@ -861,7 +861,7 @@ public class Airship
         public void execute(Commander commander)
                 throws Exception
         {
-            List<AgentStatusRepresentation> response = commander.showAgents(agentFilter);
+            List<AgentStatus> response = commander.showAgents(agentFilter);
             displayAgents(response);
         }
 

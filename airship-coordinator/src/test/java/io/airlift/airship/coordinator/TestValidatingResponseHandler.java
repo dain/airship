@@ -6,34 +6,16 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.io.CountingInputStream;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-import io.airlift.airship.shared.AgentStatusRepresentation;
 import io.airlift.http.client.HttpStatus;
-import io.airlift.http.client.Request;
 import io.airlift.http.client.Response;
-import io.airlift.json.JsonCodec;
-import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.List;
-
-import static io.airlift.airship.coordinator.ValidatingResponseHandler.validate;
-import static io.airlift.http.client.JsonResponseHandler.createJsonResponseHandler;
-import static io.airlift.http.client.Request.Builder.prepareGet;
 
 public class TestValidatingResponseHandler
 {
-    @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = ".*agentId=may not be null.*")
-    public void testValidate()
-    {
-        JsonCodec<AgentStatusRepresentation> agentCodec = JsonCodec.jsonCodec(AgentStatusRepresentation.class);
-        Request request = prepareGet().setUri(URI.create("http://localhost/")).build();
-        Response response = fakeJsonResponse("{}");
-        validate(createJsonResponseHandler(agentCodec)).handle(request, response);
-    }
-
     private static Response fakeJsonResponse(String json)
     {
         InputStream input = new ByteArrayInputStream(json.getBytes(Charsets.UTF_8));

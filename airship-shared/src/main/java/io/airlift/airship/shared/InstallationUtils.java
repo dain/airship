@@ -65,7 +65,7 @@ public class InstallationUtils
     public static Map<String, Integer> getAvailableResources(AgentStatus agentStatus)
     {
         Map<String, Integer> availableResources = new TreeMap<String, Integer>(agentStatus.getResources());
-        for (SlotStatus slotStatus : agentStatus.getSlotStatuses()) {
+        for (SlotStatus slotStatus : agentStatus.getSlots()) {
             for (Entry<String, Integer> entry : slotStatus.getResources().entrySet()) {
                 int value = Objects.firstNonNull(availableResources.get(entry.getKey()), 0);
                 availableResources.put(entry.getKey(), value - entry.getValue());

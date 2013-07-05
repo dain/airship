@@ -12,7 +12,6 @@ import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.job.InstallTask;
 import io.airlift.airship.shared.job.KillTask;
 import io.airlift.airship.shared.job.RestartTask;
@@ -70,7 +69,7 @@ public class MockRemoteAgent implements RemoteAgent
     @Override
     public synchronized List<? extends RemoteSlot> getSlots()
     {
-        return ImmutableList.copyOf(Iterables.transform(getAgentStatus().getSlotStatuses(), new Function<SlotStatus, MockRemoteSlot>()
+        return ImmutableList.copyOf(Iterables.transform(getAgentStatus().getSlots(), new Function<SlotStatus, MockRemoteSlot>()
         {
             @Override
             public MockRemoteSlot apply(SlotStatus slotStatus)
@@ -103,7 +102,7 @@ public class MockRemoteAgent implements RemoteAgent
             SlotStatus slotStatus = install(task.getInstallation());
 
             // todo: what uri to use?
-            return new MockRemoteSlotJob(URI.create("http://foo"), slotJob, SlotStatusRepresentation.from(slotStatus));
+            return new MockRemoteSlotJob(URI.create("http://foo"), slotJob, slotStatus);
         }
 
         for (Task task : slotJob.getTasks()) {
@@ -131,7 +130,7 @@ public class MockRemoteAgent implements RemoteAgent
         }
 
         // todo: what uri to use?
-        return new MockRemoteSlotJob(URI.create("http://foo"), slotJob, SlotStatusRepresentation.from(slot.status()));
+        return new MockRemoteSlotJob(URI.create("http://foo"), slotJob, slot.status());
     }
 
     @Override

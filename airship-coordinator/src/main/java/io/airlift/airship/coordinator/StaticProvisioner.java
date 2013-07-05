@@ -12,7 +12,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.http.client.Request;
@@ -56,7 +56,7 @@ public class StaticProvisioner
     private final NodeInfo nodeInfo;
     private final AsyncHttpClient httpClient;
     private final JsonCodec<CoordinatorStatusRepresentation> coordinatorCodec;
-    private final JsonCodec<AgentStatusRepresentation> agentCodec;
+    private final JsonCodec<AgentStatus> agentCodec;
 
     private final AtomicBoolean coordinatorsResourceIsUp = new AtomicBoolean(true);
     private final AtomicBoolean agentsResourceIsUp = new AtomicBoolean(true);
@@ -67,7 +67,7 @@ public class StaticProvisioner
             NodeInfo nodeInfo,
             @Global AsyncHttpClient httpClient,
             JsonCodec<CoordinatorStatusRepresentation> coordinatorCodec,
-            JsonCodec<AgentStatusRepresentation> agentCodec)
+            JsonCodec<AgentStatus> agentCodec)
     {
         this(config.getCoordinatorsUri(),
                 config.getAgentsUri(),
@@ -82,7 +82,7 @@ public class StaticProvisioner
             NodeInfo nodeInfo,
             AsyncHttpClient httpClient,
             JsonCodec<CoordinatorStatusRepresentation> coordinatorCodec,
-            JsonCodec<AgentStatusRepresentation> agentCodec)
+            JsonCodec<AgentStatus> agentCodec)
     {
         Preconditions.checkNotNull(coordinatorsUri, "coordinatorsUri is null");
         Preconditions.checkNotNull(agentsUri, "agentsUri is null");
@@ -180,17 +180,17 @@ public class StaticProvisioner
         return future;
     }
 
-    private FutureCallback<AgentStatusRepresentation> agentStatusCallback(final SettableFuture<Instance> future, final URI uri)
+    private FutureCallback<AgentStatus> agentStatusCallback(final SettableFuture<Instance> future, final URI uri)
     {
-        return new FutureCallback<AgentStatusRepresentation>()
+        return new FutureCallback<AgentStatus>()
         {
             @Override
-            public void onSuccess(AgentStatusRepresentation agent)
+            public void onSuccess(AgentStatus agent)
             {
                 future.set(new Instance(agent.getInstanceId(),
                         firstNonNull(agent.getInstanceType(), "unknown"),
                         agent.getLocation(),
-                        agent.getSelf(),
+                        agent.getInternalUri(),
                         agent.getExternalUri()));
             }
 

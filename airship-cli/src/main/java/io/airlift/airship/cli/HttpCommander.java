@@ -10,12 +10,12 @@ import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.LifecycleRequest;
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
 import io.airlift.airship.shared.AgentLifecycleState;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorLifecycleState;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.IdAndVersion;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 import io.airlift.http.client.AsyncHttpClient;
 import io.airlift.http.client.BodyGenerator;
 import io.airlift.http.client.FullJsonResponseHandler.JsonResponse;
@@ -45,14 +45,14 @@ public class HttpCommander implements Commander
 {
     private static final JsonCodec<JobStatus> JOB_INFO_CODEC = JsonCodec.jsonCodec(JobStatus.class);
 
-    private static final JsonCodec<List<SlotStatusRepresentation>> SLOTS_CODEC = JsonCodec.listJsonCodec(SlotStatusRepresentation.class);
+    private static final JsonCodec<List<SlotStatus>> SLOTS_CODEC = JsonCodec.listJsonCodec(SlotStatus.class);
     private static final JsonCodec<Assignment> ASSIGNMENT_CODEC = JsonCodec.jsonCodec(Assignment.class);
 
     private static final JsonCodec<List<CoordinatorStatusRepresentation>> COORDINATORS_CODEC = JsonCodec.listJsonCodec(CoordinatorStatusRepresentation.class);
     private static final JsonCodec<CoordinatorProvisioningRepresentation> COORDINATOR_PROVISIONING_CODEC = JsonCodec.jsonCodec(CoordinatorProvisioningRepresentation.class);
 
-    private static final JsonCodec<AgentStatusRepresentation> AGENT_CODEC = JsonCodec.jsonCodec(AgentStatusRepresentation.class);
-    private static final JsonCodec<List<AgentStatusRepresentation>> AGENTS_CODEC = JsonCodec.listJsonCodec(AgentStatusRepresentation.class);
+    private static final JsonCodec<AgentStatus> AGENT_CODEC = JsonCodec.jsonCodec(AgentStatus.class);
+    private static final JsonCodec<List<AgentStatus>> AGENTS_CODEC = JsonCodec.listJsonCodec(AgentStatus.class);
     private static final JsonCodec<AgentProvisioningRepresentation> AGENT_PROVISIONING_CODEC = JsonCodec.jsonCodec(AgentProvisioningRepresentation.class);
 
     private final JsonCodec<LifecycleRequest> lifecycleRequestCodec = jsonCodec(LifecycleRequest.class);
@@ -76,14 +76,14 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public List<SlotStatusRepresentation> show(SlotFilter slotFilter)
+    public List<SlotStatus> show(SlotFilter slotFilter)
     {
         URI uri = slotFilter.toUri(uriBuilderFrom(coordinatorUri).replacePath("/v1/slot"));
         Request request = Request.Builder.prepareGet()
                 .setUri(uri)
                 .build();
 
-        JsonResponse<List<SlotStatusRepresentation>> response = client.execute(request, createFullJsonResponseHandler(SLOTS_CODEC));
+        JsonResponse<List<SlotStatus>> response = client.execute(request, createFullJsonResponseHandler(SLOTS_CODEC));
         return response.getValue();
     }
 
@@ -163,11 +163,11 @@ public class HttpCommander implements Commander
                 .setUri(uri)
                 .build();
 
-        List<SlotStatusRepresentation> slots = client.execute(request, createJsonResponseHandler(SLOTS_CODEC));
+        List<SlotStatus> slots = client.execute(request, createJsonResponseHandler(SLOTS_CODEC));
         if (slots.isEmpty()) {
             return false;
         }
-        SlotStatusRepresentation slot = slots.get(0);
+        SlotStatus slot = slots.get(0);
         String host;
         if (useInternalAddress) {
             host = slot.getInternalHost();
@@ -268,14 +268,14 @@ public class HttpCommander implements Commander
     }
 
     @Override
-    public List<AgentStatusRepresentation> showAgents(AgentFilter agentFilter)
+    public List<AgentStatus> showAgents(AgentFilter agentFilter)
     {
         URI uri = agentFilter.toUri(uriBuilderFrom(coordinatorUri).replacePath("v1/admin/agent"));
         Request request = Request.Builder.prepareGet()
                 .setUri(uri)
                 .build();
 
-        JsonResponse<List<AgentStatusRepresentation>> response = client.execute(request, createFullJsonResponseHandler(AGENTS_CODEC));
+        JsonResponse<List<AgentStatus>> response = client.execute(request, createFullJsonResponseHandler(AGENTS_CODEC));
         if (response.getStatusCode() != 200) {
             throw new RuntimeException(response.getStatusMessage());
         }
@@ -313,7 +313,7 @@ public class HttpCommander implements Commander
         return HttpRemoteJob.createHttpRemoteJob(jobStatus, client, executor, jobStatusCodec);
     }
 
-    private List<AgentStatusRepresentation> waitForAgentsToStart(List<String> instanceIds)
+    private List<AgentStatus> waitForAgentsToStart(List<String> instanceIds)
     {
         for (int loop = 0; true; loop++) {
             try {
@@ -321,10 +321,10 @@ public class HttpCommander implements Commander
                 Request request = Request.Builder.prepareGet()
                         .setUri(uri)
                         .build();
-                List<AgentStatusRepresentation> agents = client.execute(request, createJsonResponseHandler(AGENTS_CODEC));
+                List<AgentStatus> agents = client.execute(request, createJsonResponseHandler(AGENTS_CODEC));
 
-                Map<String, AgentStatusRepresentation> runningAgents = newHashMap();
-                for (AgentStatusRepresentation agent : agents) {
+                Map<String, AgentStatus> runningAgents = newHashMap();
+                for (AgentStatus agent : agents) {
                     if (agent.getState() == AgentLifecycleState.ONLINE) {
                         runningAgents.put(agent.getInstanceId(), agent);
                     }
@@ -366,7 +366,7 @@ public class HttpCommander implements Commander
                 .setUri(uri)
                 .build();
 
-        List<AgentStatusRepresentation> agents = client.execute(request, createJsonResponseHandler(AGENTS_CODEC));
+        List<AgentStatus> agents = client.execute(request, createJsonResponseHandler(AGENTS_CODEC));
         if (agents.isEmpty()) {
             return false;
         }

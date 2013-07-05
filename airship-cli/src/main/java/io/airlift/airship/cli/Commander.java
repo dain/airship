@@ -1,17 +1,17 @@
 package io.airlift.airship.cli;
 
 import io.airlift.airship.coordinator.job.SlotLifecycleAction;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.IdAndVersion;
-import io.airlift.airship.shared.SlotStatusRepresentation;
+import io.airlift.airship.shared.SlotStatus;
 
 import java.util.List;
 
 public interface Commander
 {
-    List<SlotStatusRepresentation> show(SlotFilter slotFilter);
+    List<SlotStatus> show(SlotFilter slotFilter);
 
     RemoteJob install(List<IdAndVersion> agents, Assignment assignment);
 
@@ -38,7 +38,7 @@ public interface Commander
 
     boolean sshCoordinator(CoordinatorFilter coordinatorFilter, String command);
 
-    List<AgentStatusRepresentation> showAgents(AgentFilter agentFilter);
+    List<AgentStatus> showAgents(AgentFilter agentFilter);
 
     RemoteJob provisionAgents(String agentConfig,
             int agentCount,

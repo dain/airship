@@ -22,7 +22,7 @@ import java.util.List;
 
 import static com.google.common.collect.Lists.transform;
 import static io.airlift.airship.shared.AgentStatus.idGetter;
-import static io.airlift.airship.shared.AgentStatusRepresentation.fromAgentStatus;
+import static io.airlift.airship.shared.AgentStatus.shortenAgentStatus;
 import static io.airlift.airship.shared.CoordinatorStatusRepresentation.fromCoordinatorStatus;
 
 @Path("/v1/admin/")
@@ -82,8 +82,7 @@ public class AdminResource
 
         List<AgentStatus> agents = coordinator.getAgents(agentPredicate);
 
-        return Response.ok(transform(agents, fromAgentStatus(coordinator.getAgents(), repository)))
-                .build();
+        return Response.ok(transform(agents, shortenAgentStatus(coordinator.getAgents()))).build();
     }
 
     @POST
@@ -101,7 +100,7 @@ public class AdminResource
                 provisioning.getKeyPair(),
                 provisioning.getSecurityGroup());
 
-        return Response.ok(transform(agents, fromAgentStatus(coordinator.getAgents(), repository))).build();
+        return Response.ok(transform(agents, shortenAgentStatus(coordinator.getAgents()))).build();
     }
 
     @DELETE

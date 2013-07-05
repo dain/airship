@@ -224,7 +224,7 @@ public class CommanderFactory
         Provisioner provisioner = new LocalProvisioner();
 
         StateManager stateManager = new InMemoryStateManager();
-        for (SlotStatus slotStatus : agent.getAgentStatus().getSlotStatuses()) {
+        for (SlotStatus slotStatus : agent.getAgentStatus().getSlots()) {
             stateManager.setExpectedState(new ExpectedSlotStatus(slotStatus.getId(), slotStatus.getState(), slotStatus.getAssignment()));
         }
 
@@ -372,7 +372,7 @@ public class CommanderFactory
                     agentStatus.getExternalUri(),
                     agentStatus.getLocation(),
                     instanceType,
-                    agentStatus.getSlotStatuses(),
+                    agentStatus.getSlots(),
                     agentStatus.getResources());
         }
 

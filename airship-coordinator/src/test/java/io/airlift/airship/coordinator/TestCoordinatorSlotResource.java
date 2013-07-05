@@ -2,15 +2,14 @@ package io.airlift.airship.coordinator;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import io.airlift.airship.coordinator.job.InstallationRequest;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.Assignment;
+import io.airlift.airship.shared.ExpectedSlotStatus;
 import io.airlift.airship.shared.IdAndVersion;
 import io.airlift.airship.shared.MockUriInfo;
 import io.airlift.airship.shared.SlotStatus;
-import io.airlift.airship.shared.SlotStatusRepresentation;
 import io.airlift.airship.shared.job.SlotJobStatus;
 import io.airlift.http.server.HttpServerConfig;
 import io.airlift.http.server.HttpServerInfo;
@@ -22,9 +21,9 @@ import org.testng.annotations.Test;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -32,12 +31,10 @@ import java.util.concurrent.TimeUnit;
 import static io.airlift.airship.coordinator.CoordinatorSlotResource.MIN_PREFIX_SIZE;
 import static io.airlift.airship.shared.AgentLifecycleState.ONLINE;
 import static io.airlift.airship.shared.AssignmentHelper.APPLE_ASSIGNMENT;
-import static io.airlift.airship.shared.AssignmentHelper.BANANA_ASSIGNMENT;
 import static io.airlift.airship.shared.ExtraAssertions.assertEqualsNoOrder;
 import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
-import static io.airlift.airship.shared.SlotStatus.createSlotStatus;
+import static io.airlift.airship.shared.SlotStatus.shortenSlotStatus;
 import static io.airlift.airship.shared.Strings.shortestUniquePrefix;
-import static java.lang.Math.min;
 import static java.util.Arrays.asList;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -49,6 +46,7 @@ public class TestCoordinatorSlotResource
     private Coordinator coordinator;
     private TestingMavenRepository repository;
     private MockProvisioner provisioner;
+    private InMemoryStateManager stateManager;
 
     @BeforeMethod
     public void setUp()
@@ -59,6 +57,7 @@ public class TestCoordinatorSlotResource
         repository = new TestingMavenRepository();
 
         provisioner = new MockProvisioner();
+        stateManager = new InMemoryStateManager();
         coordinator = new Coordinator(nodeInfo,
                 new HttpServerInfo(new HttpServerConfig(), nodeInfo),
                 new CoordinatorConfig().setStatusExpiration(new Duration(1, TimeUnit.DAYS)),
@@ -66,7 +65,7 @@ public class TestCoordinatorSlotResource
                 provisioner.getAgentFactory(),
                 repository,
                 provisioner,
-                new InMemoryStateManager(),
+                stateManager,
                 new MockServiceInventory());
         resource = new CoordinatorSlotResource(coordinator, repository);
     }
@@ -81,24 +80,44 @@ public class TestCoordinatorSlotResource
     @Test
     public void testGetAllSlots()
     {
-        SlotStatus slot1 = createSlotStatus(UUID.randomUUID(),
+        UUID slot1Id = UUID.randomUUID();
+        SlotStatus slot1 = new SlotStatus(
+                slot1Id,
+                slot1Id.toString(),
                 URI.create("fake://localhost/v1/agent/slot/slot1"),
                 URI.create("fake://localhost/v1/agent/slot/slot1"),
                 "instance-id",
+                "/location",
                 "/location",
                 STOPPED,
                 APPLE_ASSIGNMENT,
                 "/slot1",
-                ImmutableMap.<String, Integer>of());
-        SlotStatus slot2 = createSlotStatus(UUID.randomUUID(),
+                ImmutableMap.<String, Integer>of(),
+                STOPPED,
+                APPLE_ASSIGNMENT,
+                null,
+                SlotStatus.createSlotVersion(slot1Id, STOPPED, APPLE_ASSIGNMENT));
+        stateManager.setExpectedState(new ExpectedSlotStatus(slot1));
+
+        UUID slot2Id = UUID.randomUUID();
+        SlotStatus slot2 = new SlotStatus(
+                slot2Id,
+                slot2Id.toString(),
                 URI.create("fake://localhost/v1/agent/slot/slot2"),
                 URI.create("fake://localhost/v1/agent/slot/slot2"),
                 "instance-id",
                 "/location",
+                "/location",
                 STOPPED,
                 APPLE_ASSIGNMENT,
                 "/slot2",
-                ImmutableMap.<String, Integer>of());
+                ImmutableMap.<String, Integer>of(),
+                STOPPED,
+                APPLE_ASSIGNMENT,
+                null,
+                SlotStatus.createSlotVersion(slot2Id, STOPPED, APPLE_ASSIGNMENT));
+        stateManager.setExpectedState(new ExpectedSlotStatus(slot2));
+
         AgentStatus agentStatus = new AgentStatus(UUID.randomUUID().toString(),
                 ONLINE,
                 "instance-id",
@@ -117,31 +136,51 @@ public class TestCoordinatorSlotResource
         Response response = resource.getAllSlots(MockUriInfo.from(requestUri));
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
         assertEqualsNoOrder((Iterable<?>) response.getEntity(),
-                ImmutableList.of(SlotStatusRepresentation.from(slot1, prefixSize, repository), SlotStatusRepresentation.from(slot2, prefixSize, repository)));
+                ImmutableList.of(shortenSlotStatus(slot1, prefixSize, 0, repository), shortenSlotStatus(slot2, prefixSize, 0, repository)));
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
     }
 
     @Test
     public void testGetAllSlotsWithFilter()
     {
-        SlotStatus slot1 = createSlotStatus(UUID.randomUUID(),
+        UUID slot1Id = UUID.randomUUID();
+        SlotStatus slot1 = new SlotStatus(
+                slot1Id,
+                slot1Id.toString(),
                 URI.create("fake://foo/v1/agent/slot/slot1"),
                 URI.create("fake://foo/v1/agent/slot/slot1"),
                 "instance-id",
+                "/location",
                 "/location",
                 STOPPED,
                 APPLE_ASSIGNMENT,
                 "/slot1",
-                ImmutableMap.<String, Integer>of());
-        SlotStatus slot2 = createSlotStatus(UUID.randomUUID(),
+                ImmutableMap.<String, Integer>of(),
+                STOPPED,
+                APPLE_ASSIGNMENT,
+                null,
+                SlotStatus.createSlotVersion(slot1Id, STOPPED, APPLE_ASSIGNMENT));
+        stateManager.setExpectedState(new ExpectedSlotStatus(slot1));
+
+        UUID slot2Id = UUID.randomUUID();
+        SlotStatus slot2 = new SlotStatus(
+                slot2Id,
+                slot2Id.toString(),
                 URI.create("fake://bar/v1/agent/slot/slot2"),
                 URI.create("fake://bar/v1/agent/slot/slot2"),
                 "instance-id",
                 "/location",
+                "/location",
                 STOPPED,
                 APPLE_ASSIGNMENT,
                 "/slot2",
-                ImmutableMap.<String, Integer>of());
+                ImmutableMap.<String, Integer>of(),
+                STOPPED,
+                APPLE_ASSIGNMENT,
+                null,
+                SlotStatus.createSlotVersion(slot2Id, STOPPED, APPLE_ASSIGNMENT));
+        stateManager.setExpectedState(new ExpectedSlotStatus(slot2));
+
         AgentStatus agentStatus = new AgentStatus(UUID.randomUUID().toString(),
                 ONLINE,
                 "instance-id",
@@ -159,7 +198,7 @@ public class TestCoordinatorSlotResource
         URI requestUri = URI.create("http://localhost/v1/slot?host=foo");
         Response response = resource.getAllSlots(MockUriInfo.from(requestUri));
         assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
-        assertEqualsNoOrder((Iterable<?>) response.getEntity(), ImmutableList.of(SlotStatusRepresentation.from(slot1, prefixSize, repository)));
+        assertEqualsNoOrder((Iterable<?>) response.getEntity(), ImmutableList.of(shortenSlotStatus(slot1, prefixSize, 0, repository)));
         assertNull(response.getMetadata().get("Content-Type")); // content type is set by jersey based on @Produces
     }
 
@@ -203,7 +242,7 @@ public class TestCoordinatorSlotResource
         JobStatus job = (JobStatus) response.getEntity();
         assertEquals(job.getSlotJobStatuses().size(), numberOfAgents);
         for (SlotJobStatus slotJob : job.getSlotJobStatuses()) {
-            SlotStatus slot = slotJob.getSlotStatus().toSlotStatus("instance");
+            SlotStatus slot = slotJob.getSlotStatus().changeInstanceId("instance");
             assertEquals(slot.getAssignment(), assignment);
             assertEquals(slot.getState(), STOPPED);
         }
@@ -269,9 +308,9 @@ public class TestCoordinatorSlotResource
 //        response.getEntity();
 //    }
 
-    private void assertAppleSlot(SlotStatusRepresentation slotRepresentation)
+    private void assertAppleSlot(SlotStatus slotRepresentation)
     {
-        SlotStatus slot = slotRepresentation.toSlotStatus("instance");
+        SlotStatus slot = slotRepresentation.changeInstanceId("instance");
         assertEquals(slot.getAssignment(), APPLE_ASSIGNMENT);
         assertEquals(slot.getState(), STOPPED);
         assertEquals(slot.getResources(), ImmutableMap.of("cpu", 1, "memory", 512));

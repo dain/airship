@@ -5,7 +5,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.airlift.airship.shared.AgentLifecycleState;
-import io.airlift.airship.shared.AgentStatusRepresentation;
+import io.airlift.airship.shared.AgentStatus;
 import org.fusesource.jansi.Ansi.Color;
 
 import java.util.List;
@@ -14,21 +14,21 @@ import static io.airlift.airship.cli.Ansi.colorize;
 
 public class AgentRecord implements Record
 {
-    public static List<Record> toAgentRecords(Iterable<AgentStatusRepresentation> agents)
+    public static List<Record> toAgentRecords(Iterable<AgentStatus> agents)
     {
-        return ImmutableList.copyOf(Iterables.transform(agents, new Function<AgentStatusRepresentation, Record>()
+        return ImmutableList.copyOf(Iterables.transform(agents, new Function<AgentStatus, Record>()
         {
             @Override
-            public AgentRecord apply(AgentStatusRepresentation agent)
+            public AgentRecord apply(AgentStatus agent)
             {
                 return new AgentRecord(agent);
             }
         }));
     }
 
-    private final AgentStatusRepresentation agentStatus;
+    private final AgentStatus agentStatus;
 
-    public AgentRecord(AgentStatusRepresentation agentStatus)
+    public AgentRecord(AgentStatus agentStatus)
     {
         Preconditions.checkNotNull(agentStatus, "agentStatus is null");
 
@@ -59,7 +59,7 @@ public class AgentRecord implements Record
             case instanceType:
                 return agentStatus.getInstanceType();
             case internalUri:
-                return agentStatus.getSelf();
+                return agentStatus.getInternalUri();
             case externalUri:
                 return agentStatus.getExternalUri();
             default:
