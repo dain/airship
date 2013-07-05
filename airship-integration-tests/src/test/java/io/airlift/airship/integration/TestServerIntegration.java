@@ -270,17 +270,17 @@ public class TestServerIntegration
         agentInstanceId = agentServer.getInstanceId();
 
         Agent agent = agentServer.getAgent();
-        appleSlot1 = agent.getSlot(agent.install(new Installation("apple",
+        appleSlot1 = agent.getSlot(agent.install(new Installation(
                 APPLE_ASSIGNMENT,
                 repository.binaryToHttpUri(APPLE_ASSIGNMENT.getBinary()),
                 repository.configToHttpUri(APPLE_ASSIGNMENT.getConfig()),
                 ImmutableMap.of("memory", 512))).getId());
-        appleSlot2 = agent.getSlot(agent.install(new Installation("apple",
+        appleSlot2 = agent.getSlot(agent.install(new Installation(
                 APPLE_ASSIGNMENT,
                 repository.binaryToHttpUri(APPLE_ASSIGNMENT.getBinary()),
                 repository.configToHttpUri(APPLE_ASSIGNMENT.getConfig()),
                 ImmutableMap.of("memory", 512))).getId());
-        bananaSlot = agent.getSlot(agent.install(new Installation("banana",
+        bananaSlot = agent.getSlot(agent.install(new Installation(
                 BANANA_ASSIGNMENT,
                 repository.binaryToHttpUri(BANANA_ASSIGNMENT.getBinary()),
                 repository.configToHttpUri(BANANA_ASSIGNMENT.getConfig()),
@@ -686,7 +686,7 @@ public class TestServerIntegration
         Agent agent = initializeOneAgent();
         waitForAgentStatusPropagation(agent);
 
-        Installation foo = new Installation("apple",
+        Installation foo = new Installation(
                 APPLE_ASSIGNMENT,
                 repository.binaryToHttpUri(APPLE_ASSIGNMENT.getBinary()),
                 repository.configToHttpUri(APPLE_ASSIGNMENT.getConfig()),

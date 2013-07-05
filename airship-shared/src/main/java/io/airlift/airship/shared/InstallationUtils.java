@@ -31,7 +31,6 @@ public class InstallationUtils
         URI configUri = repository.configToHttpUri(assignment.getConfig());
         Preconditions.checkNotNull(configUri, "Unknown config %s", configUri);
         return new Installation(
-                repository.configShortName(assignment.getConfig()),
                 assignment,
                 binaryUri,
                 configUri,

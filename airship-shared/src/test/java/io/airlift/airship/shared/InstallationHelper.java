@@ -13,12 +13,12 @@ import static io.airlift.airship.shared.FileUtils.deleteRecursively;
 
 public class InstallationHelper
 {
-    public static final Installation APPLE_INSTALLATION = new Installation("apple",
+    public static final Installation APPLE_INSTALLATION = new Installation(
             APPLE_ASSIGNMENT,
             URI.create("fake://localhost/apple.tar.gz"),
             URI.create("fake://localhost/apple.config"),
             ImmutableMap.of("memory", 512));
-    public static final Installation BANANA_INSTALLATION = new Installation("banana",
+    public static final Installation BANANA_INSTALLATION = new Installation(
             BANANA_ASSIGNMENT,
             URI.create("fake://localhost/banana.tar.gz"),
             URI.create("fake://localhost/banana.config"),
@@ -46,8 +46,8 @@ public class InstallationHelper
         }
         this.targetRepo = targetRepo;
 
-        appleInstallation = new Installation("apple", APPLE_ASSIGNMENT, binaryFile.toURI(), new File("README.txt").toURI(), ImmutableMap.of("memory", 512));
-        bananaInstallation = new Installation("banana", BANANA_ASSIGNMENT, binaryFile.toURI(), new File("README.txt").toURI(), ImmutableMap.of("cpu", 1));
+        appleInstallation = new Installation(APPLE_ASSIGNMENT, binaryFile.toURI(), new File("README.txt").toURI(), ImmutableMap.of("memory", 512));
+        bananaInstallation = new Installation(BANANA_ASSIGNMENT, binaryFile.toURI(), new File("README.txt").toURI(), ImmutableMap.of("cpu", 1));
     }
 
     public void destroy()

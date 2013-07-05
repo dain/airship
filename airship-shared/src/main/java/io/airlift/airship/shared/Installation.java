@@ -15,46 +15,39 @@ package io.airlift.airship.shared;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 import javax.annotation.concurrent.Immutable;
+
 import java.net.URI;
 import java.util.Map;
 
 @Immutable
 public class Installation
 {
-    private final String shortName;
     private final Assignment assignment;
     private final URI binaryFile;
     private final URI configFile;
     private final Map<String, Integer> resources;
 
     @JsonCreator
-    public Installation(@JsonProperty("shortName") String shortName,
+    public Installation(
             @JsonProperty("assignment") Assignment assignment,
             @JsonProperty("binaryFile") URI binaryFile,
             @JsonProperty("configFile") URI configFile,
             @JsonProperty("resources") Map<String, Integer> resources)
     {
-        Preconditions.checkNotNull(shortName, "shortName is null");
         Preconditions.checkNotNull(assignment, "assignment is null");
         Preconditions.checkNotNull(binaryFile, "binaryFile is null");
         Preconditions.checkNotNull(configFile, "configFile is null");
         Preconditions.checkNotNull(resources, "resources is null");
 
-        this.shortName = shortName;
         this.assignment = assignment;
         this.binaryFile = binaryFile;
         this.configFile = configFile;
         this.resources = ImmutableMap.copyOf(resources);
-    }
-
-    @JsonProperty
-    public String getShortName()
-    {
-        return shortName;
     }
 
     @JsonProperty
@@ -82,41 +75,33 @@ public class Installation
     }
 
     @Override
-    public boolean equals(Object o)
+    public int hashCode()
     {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
-        Installation that = (Installation) o;
-
-        if (!assignment.equals(that.assignment)) {
-            return false;
-        }
-
-        return true;
+        return Objects.hashCode(assignment, binaryFile, configFile, resources);
     }
 
     @Override
-    public int hashCode()
+    public boolean equals(Object obj)
     {
-        return assignment.hashCode();
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        final Installation other = (Installation) obj;
+        return Objects.equal(this.assignment, other.assignment) && Objects.equal(this.binaryFile, other.binaryFile) && Objects.equal(this.configFile,
+                other.configFile) && Objects.equal(this.resources, other.resources);
     }
 
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("Installation");
-        sb.append("{shortName=").append(shortName);
-        sb.append(", assignment=").append(assignment);
-        sb.append(", binaryFile=").append(binaryFile);
-        sb.append(", configFile=").append(configFile);
-        sb.append(", resources=").append(resources);
-        sb.append('}');
-        return sb.toString();
+        return Objects.toStringHelper(this)
+                .add("assignment", assignment)
+                .add("binaryFile", binaryFile)
+                .add("configFile", configFile)
+                .add("resources", resources)
+                .toString();
     }
 }

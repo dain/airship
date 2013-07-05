@@ -830,7 +830,6 @@ public class Coordinator
         URI configFile = repository.configToHttpUri(assignment.getConfig());
 
         Installation installation = new Installation(
-                repository.configShortName(assignment.getConfig()),
                 assignment,
                 repository.binaryToHttpUri(assignment.getBinary()),
                 configFile, ImmutableMap.<String, Integer>of());

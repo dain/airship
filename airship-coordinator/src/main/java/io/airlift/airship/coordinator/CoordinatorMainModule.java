@@ -27,7 +27,7 @@ import io.airlift.airship.coordinator.job.LifecycleRequest;
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.CoordinatorStatusRepresentation;
 import io.airlift.airship.shared.ExpectedSlotStatus;
-import io.airlift.airship.shared.InstallationRepresentation;
+import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.Repository;
 import io.airlift.airship.shared.RepositorySet;
 import io.airlift.airship.shared.SlotStatus;
@@ -77,7 +77,7 @@ public class CoordinatorMainModule
         Multibinder.newSetBinder(binder, Filter.class, TheServlet.class).addBinding().to(AuthFilter.class).in(Scopes.SINGLETON);
         bindConfig(binder).to(AuthConfig.class);
 
-        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(InstallationRepresentation.class);
+        JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(Installation.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(CoordinatorStatusRepresentation.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(AgentStatus.class);
         JsonCodecBinder.jsonCodecBinder(binder).bindJsonCodec(SlotStatus.class);

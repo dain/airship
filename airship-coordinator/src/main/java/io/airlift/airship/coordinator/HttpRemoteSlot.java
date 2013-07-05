@@ -2,7 +2,6 @@ package io.airlift.airship.coordinator;
 
 import com.google.common.base.Preconditions;
 import io.airlift.airship.shared.Installation;
-import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.Request;
@@ -26,7 +25,7 @@ import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 public class HttpRemoteSlot implements RemoteSlot
 {
     private static final Logger log = Logger.get(HttpRemoteSlot.class);
-    private static final JsonCodec<InstallationRepresentation> installationCodec = jsonCodec(InstallationRepresentation.class);
+    private static final JsonCodec<Installation> installationCodec = jsonCodec(Installation.class);
     private static final JsonCodec<SlotStatus> slotStatusCodec = jsonCodec(SlotStatus.class);
 
     private SlotStatus slotStatus;
@@ -79,7 +78,7 @@ public class HttpRemoteSlot implements RemoteSlot
             Request request = Request.Builder.preparePut()
                     .setUri(uriBuilderFrom(slotStatus.getSelf()).appendPath("assignment").build())
                     .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                    .setBodyGenerator(jsonBodyGenerator(installationCodec, InstallationRepresentation.from(installation)))
+                    .setBodyGenerator(jsonBodyGenerator(installationCodec, installation))
                     .build();
             SlotStatus slotStatus = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.OK.getStatusCode()));
 

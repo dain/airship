@@ -6,7 +6,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import io.airlift.airship.shared.AgentLifecycleState;
 import io.airlift.airship.shared.AgentStatus;
-import io.airlift.airship.shared.InstallationRepresentation;
+import io.airlift.airship.shared.Installation;
 import io.airlift.airship.shared.SlotStatus;
 import io.airlift.discovery.client.ServiceDescriptorsRepresentation;
 import io.airlift.http.client.AsyncHttpClient;
@@ -20,7 +20,7 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
 {
     private final String environment;
     private final AsyncHttpClient httpClient;
-    private final JsonCodec<InstallationRepresentation> installationCodec;
+    private final JsonCodec<Installation> installationCodec;
     private final JsonCodec<AgentStatus> agentStatusCodec;
     private final JsonCodec<SlotStatus> slotStatusCodec;
     private final JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec;
@@ -31,7 +31,7 @@ public class HttpRemoteAgentFactory implements RemoteAgentFactory
     public HttpRemoteAgentFactory(NodeInfo nodeInfo,
             @Global AsyncHttpClient httpClient,
             HttpRemoteSlotJobFactory slotJobFactory,
-            JsonCodec<InstallationRepresentation> installationCodec,
+            JsonCodec<Installation> installationCodec,
             JsonCodec<SlotStatus> slotStatusCodec,
             JsonCodec<AgentStatus> agentStatusCodec,
             JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec)

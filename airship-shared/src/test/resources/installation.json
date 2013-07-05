@@ -4,8 +4,8 @@
         "config": "@prod:apple:1.0"
     },
     "binaryFile": "fetch://binary.tar.gz",
-    "configFiles": {
-        "etc/config.properties": "fetch://config.properties",
-        "readme.txt": "fetch://readme.txt"
+    "configFile": "fetch://config.config",
+    "resources" : {
+        "memory": 512
     }
 }

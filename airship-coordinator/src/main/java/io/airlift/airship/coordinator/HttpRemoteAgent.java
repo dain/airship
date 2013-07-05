@@ -15,7 +15,6 @@ import io.airlift.airship.coordinator.SimpleHttpResponseHandler.SimpleHttpRespon
 import io.airlift.airship.shared.AgentStatus;
 import io.airlift.airship.shared.AirshipHeaders;
 import io.airlift.airship.shared.Installation;
-import io.airlift.airship.shared.InstallationRepresentation;
 import io.airlift.airship.shared.SetThreadName;
 import io.airlift.airship.shared.SlotLifecycleState;
 import io.airlift.airship.shared.SlotStatus;
@@ -58,7 +57,7 @@ public class HttpRemoteAgent
 {
     private static final Logger log = Logger.get(HttpRemoteAgent.class);
 
-    private final JsonCodec<InstallationRepresentation> installationCodec;
+    private final JsonCodec<Installation> installationCodec;
     private final JsonCodec<AgentStatus> agentStatusCodec;
     private final JsonCodec<SlotStatus> slotStatusCodec;
     private final JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec;
@@ -79,7 +78,7 @@ public class HttpRemoteAgent
             HttpRemoteSlotJobFactory slotJobFactory,
             AsyncHttpClient httpClient,
             Executor executor,
-            JsonCodec<InstallationRepresentation> installationCodec,
+            JsonCodec<Installation> installationCodec,
             JsonCodec<AgentStatus> agentStatusCodec,
             JsonCodec<SlotStatus> slotStatusCodec,
             JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec)
@@ -102,7 +101,7 @@ public class HttpRemoteAgent
             HttpRemoteSlotJobFactory slotJobFactory,
             AsyncHttpClient httpClient,
             Executor executor,
-            JsonCodec<InstallationRepresentation> installationCodec,
+            JsonCodec<Installation> installationCodec,
             JsonCodec<AgentStatus> agentStatusCodec,
             JsonCodec<SlotStatus> slotStatusCodec,
             JsonCodec<ServiceDescriptorsRepresentation> serviceDescriptorsCodec)
@@ -254,7 +253,7 @@ public class HttpRemoteAgent
             Request request = Request.Builder.preparePost()
                     .setUri(uriBuilderFrom(internalUri).replacePath("/v1/agent/slot/").build())
                     .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                    .setBodyGenerator(jsonBodyGenerator(installationCodec, InstallationRepresentation.from(installation)))
+                    .setBodyGenerator(jsonBodyGenerator(installationCodec, installation))
                     .build();
             SlotStatus slotStatus = httpClient.execute(request, createJsonResponseHandler(slotStatusCodec, Status.CREATED.getStatusCode()));
 

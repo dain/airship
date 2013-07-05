@@ -32,7 +32,7 @@ import static io.airlift.airship.shared.SlotLifecycleState.STOPPED;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static org.testng.Assert.assertEquals;
 
-public class TestAgentStatusRepresentation
+public class TestAgentStatus
 {
     private final JsonCodec<AgentStatus> codec = jsonCodec(AgentStatus.class);
 
