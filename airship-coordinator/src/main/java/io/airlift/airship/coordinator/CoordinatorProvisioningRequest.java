@@ -16,7 +16,7 @@ package io.airlift.airship.coordinator;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class CoordinatorProvisioningRepresentation
+public class CoordinatorProvisioningRequest
 {
     private final String coordinatorConfig;
     private final int coordinatorCount;
@@ -27,7 +27,7 @@ public class CoordinatorProvisioningRepresentation
     private final String securityGroup;
 
     @JsonCreator
-    public CoordinatorProvisioningRepresentation(
+    public CoordinatorProvisioningRequest(
             @JsonProperty("coordinatorConfig") String coordinatorConfig,
             @JsonProperty("coordinatorCount") int coordinatorCount,
             @JsonProperty("instanceType") String instanceType,

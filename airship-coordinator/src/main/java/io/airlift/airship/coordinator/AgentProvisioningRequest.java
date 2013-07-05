@@ -16,7 +16,7 @@ package io.airlift.airship.coordinator;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class AgentProvisioningRepresentation
+public class AgentProvisioningRequest
 {
     private final String agentConfig;
     private final int agentCount;
@@ -27,7 +27,7 @@ public class AgentProvisioningRepresentation
     private final String securityGroup;
 
     @JsonCreator
-    public AgentProvisioningRepresentation(
+    public AgentProvisioningRequest(
             @JsonProperty("agentConfig") String agentConfig,
             @JsonProperty("agentCount") int agentCount,
             @JsonProperty("instanceType") String instanceType,

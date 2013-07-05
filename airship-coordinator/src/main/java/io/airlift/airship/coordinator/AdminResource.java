@@ -52,7 +52,7 @@ public class AdminResource
     @Path("/coordinator")
     @Produces(MediaType.APPLICATION_JSON)
     public Response provisionCoordinator(
-            CoordinatorProvisioningRepresentation provisioning,
+            CoordinatorProvisioningRequest provisioning,
             @Context UriInfo uriInfo)
             throws Exception
     {
@@ -88,7 +88,7 @@ public class AdminResource
     @POST
     @Path("/agent")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response provisionAgent(AgentProvisioningRepresentation provisioning, @Context UriInfo uriInfo)
+    public Response provisionAgent(AgentProvisioningRequest provisioning, @Context UriInfo uriInfo)
             throws Exception
     {
         List<AgentStatus> agents = coordinator.provisionAgents(

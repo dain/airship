@@ -3,8 +3,8 @@ package io.airlift.airship.cli;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import io.airlift.airship.coordinator.AgentProvisioningRepresentation;
-import io.airlift.airship.coordinator.CoordinatorProvisioningRepresentation;
+import io.airlift.airship.coordinator.AgentProvisioningRequest;
+import io.airlift.airship.coordinator.CoordinatorProvisioningRequest;
 import io.airlift.airship.coordinator.job.InstallationRequest;
 import io.airlift.airship.coordinator.job.JobStatus;
 import io.airlift.airship.coordinator.job.LifecycleRequest;
@@ -49,11 +49,11 @@ public class HttpCommander implements Commander
     private static final JsonCodec<Assignment> ASSIGNMENT_CODEC = JsonCodec.jsonCodec(Assignment.class);
 
     private static final JsonCodec<List<CoordinatorStatusRepresentation>> COORDINATORS_CODEC = JsonCodec.listJsonCodec(CoordinatorStatusRepresentation.class);
-    private static final JsonCodec<CoordinatorProvisioningRepresentation> COORDINATOR_PROVISIONING_CODEC = JsonCodec.jsonCodec(CoordinatorProvisioningRepresentation.class);
+    private static final JsonCodec<CoordinatorProvisioningRequest> COORDINATOR_PROVISIONING_CODEC = JsonCodec.jsonCodec(CoordinatorProvisioningRequest.class);
 
     private static final JsonCodec<AgentStatus> AGENT_CODEC = JsonCodec.jsonCodec(AgentStatus.class);
     private static final JsonCodec<List<AgentStatus>> AGENTS_CODEC = JsonCodec.listJsonCodec(AgentStatus.class);
-    private static final JsonCodec<AgentProvisioningRepresentation> AGENT_PROVISIONING_CODEC = JsonCodec.jsonCodec(AgentProvisioningRepresentation.class);
+    private static final JsonCodec<AgentProvisioningRequest> AGENT_PROVISIONING_CODEC = JsonCodec.jsonCodec(AgentProvisioningRequest.class);
 
     private final JsonCodec<LifecycleRequest> lifecycleRequestCodec = jsonCodec(LifecycleRequest.class);
     private final JsonCodec<InstallationRequest> installationRequestCodec = jsonCodec(InstallationRequest.class);
@@ -203,7 +203,7 @@ public class HttpCommander implements Commander
     {
         URI uri = uriBuilderFrom(coordinatorUri).replacePath("v1/admin/coordinator").build();
 
-        CoordinatorProvisioningRepresentation coordinatorProvisioning = new CoordinatorProvisioningRepresentation(
+        CoordinatorProvisioningRequest coordinatorProvisioning = new CoordinatorProvisioningRequest(
                 coordinatorConfig,
                 coordinatorCount,
                 instanceType,
@@ -294,7 +294,7 @@ public class HttpCommander implements Commander
     {
         URI uri = uriBuilderFrom(coordinatorUri).replacePath("v1/admin/agent").build();
 
-        AgentProvisioningRepresentation agentProvisioning = new AgentProvisioningRepresentation(
+        AgentProvisioningRequest agentProvisioning = new AgentProvisioningRequest(
                 agentConfig,
                 agentCount,
                 instanceType,

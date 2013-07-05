@@ -100,8 +100,8 @@ public class TestCoordinatorServer
     private final JsonCodec<List<CoordinatorStatusRepresentation>> coordinatorStatusesCodec = listJsonCodec(CoordinatorStatusRepresentation.class);
     private final JsonCodec<List<AgentStatus>> agentStatusesCodec = listJsonCodec(AgentStatus.class);
     private final JsonCodec<List<SlotStatus>> slotStatusesCodec = listJsonCodec(SlotStatus.class);
-    private final JsonCodec<CoordinatorProvisioningRepresentation> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRepresentation.class);
-    private final JsonCodec<AgentProvisioningRepresentation> agentProvisioningCodec = jsonCodec(AgentProvisioningRepresentation.class);
+    private final JsonCodec<CoordinatorProvisioningRequest> coordinatorProvisioningCodec = jsonCodec(CoordinatorProvisioningRequest.class);
+    private final JsonCodec<AgentProvisioningRequest> agentProvisioningCodec = jsonCodec(AgentProvisioningRequest.class);
 
     private final JsonCodec<LifecycleRequest> lifecycleRequestCodec = jsonCodec(LifecycleRequest.class);
     private final JsonCodec<InstallationRequest> installationRequestCodec = jsonCodec(InstallationRequest.class);
@@ -325,11 +325,11 @@ public class TestCoordinatorServer
     {
         // provision the coordinator and verify
         String instanceType = "instance-type";
-        CoordinatorProvisioningRepresentation coordinatorProvisioningRepresentation = new CoordinatorProvisioningRepresentation("coordinator:config:1", 1, instanceType, null, null, null, null);
+        CoordinatorProvisioningRequest coordinatorProvisioningRequest = new CoordinatorProvisioningRequest("coordinator:config:1", 1, instanceType, null, null, null, null);
         Request request = Request.Builder.preparePost()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/admin/coordinator").build())
                 .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .setBodyGenerator(jsonBodyGenerator(coordinatorProvisioningCodec, coordinatorProvisioningRepresentation))
+                .setBodyGenerator(jsonBodyGenerator(coordinatorProvisioningCodec, coordinatorProvisioningRequest))
                 .build();
         List<CoordinatorStatusRepresentation> coordinators = httpClient.execute(request, createJsonResponseHandler(coordinatorStatusesCodec, Status.OK.getStatusCode()));
 
@@ -448,11 +448,11 @@ public class TestCoordinatorServer
     {
         // provision the agent and verify
         String instanceType = "instance-type";
-        AgentProvisioningRepresentation agentProvisioningRepresentation = new AgentProvisioningRepresentation("agent:config:1", 1, instanceType, null, null, null, null);
+        AgentProvisioningRequest agentProvisioningRequest = new AgentProvisioningRequest("agent:config:1", 1, instanceType, null, null, null, null);
         Request request = Request.Builder.preparePost()
                 .setUri(coordinatorUriBuilder().appendPath("/v1/admin/agent").build())
                 .setHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .setBodyGenerator(jsonBodyGenerator(agentProvisioningCodec, agentProvisioningRepresentation))
+                .setBodyGenerator(jsonBodyGenerator(agentProvisioningCodec, agentProvisioningRequest))
                 .build();
         List<AgentStatus> agents = httpClient.execute(request, createJsonResponseHandler(agentStatusesCodec, Status.OK.getStatusCode()));
 
